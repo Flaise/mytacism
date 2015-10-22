@@ -27,6 +27,9 @@ for(let pair of [
     '1.5',
     'NaN',
     
+    `a`,
+    `asdf`,
+    `wqer_oiup`,
     [`num`, `1`],
     [`num; num;`, `1; 1;`],
     
@@ -111,8 +114,17 @@ for(let pair of [
     
     `function* r() { yield 3 }`,
     [`function* r() { yield 3 - num }`, `function* r() { yield 2 }`],
-    `function* r() { return yield "asdf" }`,
+    `function* r(werw, eois, jlksdc) { return yield "asdf" }`,
     [`function* r() { return yield "asdf" + num }`, `function* r() { return yield "asdf1" }`],
+    
+    `a = 1`,
+    `a = 3`,
+    `a = "asdf"`,
+    `a += 2`,
+    [`a += num`, `a += 1`],
+    [`a -= num - 3`, `a -= -2`],
+    `a(r *= 3)`,
+    [`if(n %= num) { b /= num / 4 }`, `if(n %= 1) { b /= 0.25 }`],
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair

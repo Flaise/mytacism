@@ -167,6 +167,9 @@ function walk(node, options, trace, allowContextFunctions) {
         node.key = walk(node.key, options, trace)
         node.value = walk(node.value, options, trace)
     }
+    else if(node.type === 'AssignmentExpression') {
+        node.right = walk(node.right, options, trace)
+    }
     else {
         console.log('unknown type\n', node, '\n', trace)
     }
