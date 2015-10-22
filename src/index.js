@@ -7,12 +7,18 @@ export default function process(code, options) {
     return print(ast, options)
 }
 
-const operators = {
+const binaryOperators = {
     '+': (a, b) => a + b,
     '-': (a, b) => a - b,
     '/': (a, b) => a / b,
     '*': (a, b) => a * b,
-    '%': (a, b) => a % b
+    '%': (a, b) => a % b,
+    '===': (a, b) => a === b,
+    '!==': (a, b) => a !== b
+}
+const unaryOperators = {
+    '+': (a => +a),
+    '-': (a => -a)
 }
 
 function valueToNode(value) {
@@ -42,7 +48,8 @@ function contextValueToNode(node, options, allowFunctions) {
         if(allowFunctions)
             return FAIL
         else
-            throw new Error('Context function must be invoked at compile-time')
+            throw new Error(`Compile-time function referenced but not called at line ` +
+                            `${node.loc.start.line}, column ${node.loc.start.column}`)
     }
     return valueToNode(result)
 }
@@ -83,22 +90,34 @@ function walk(node, options, trace, allowContextFunctions) {
             }
         }
     }
-    else if(node.type === 'Literal' || node.type === 'FunctionDeclaration') {
+    else if(node.type === 'Literal' || node.type === 'FunctionDeclaration' || node.type === 'EmptyStatement') {
         // pass
     }
     else if(node.type === 'File')
         node.program = walk(node.program, options, trace)
-    else if(node.type === 'Program')
+    else if(node.type === 'Program' || node.type === 'BlockStatement')
         node.body = walk(node.body, options, trace)
+    else if(node.type === 'UnaryExpression') {
+        node.argument = walk(node.argument, options, trace)
+        
+        if(node.argument.type === 'Literal') {
+            const operator = unaryOperators[node.operator]
+            if(operator)
+                return types.builders.literal(operator(node.argument.value))
+            else
+                console.warn(`Unknown unary operator "${node.operator}"`)
+        }
+    }
     else if(node.type === 'BinaryExpression') {
         node.left = walk(node.left, options, trace)
         node.right = walk(node.right, options, trace)
         
         if(node.left.type === 'Literal' && node.right.type === 'Literal') {
-            const operator = operators[node.operator]
-            const left = node.left.value
-            const right = node.right.value
-            return types.builders.literal(operator(left, right))
+            const operator = binaryOperators[node.operator]
+            if(operator)
+                return types.builders.literal(operator(node.left.value, node.right.value))
+            else
+                console.warn(`Unknown binary operator "${node.operator}"`)
         }
     }
     else if(node.type === 'ExpressionStatement') {
@@ -109,7 +128,7 @@ function walk(node, options, trace, allowContextFunctions) {
         if(result !== FAIL)
             return result
     }
-    else if(node.type === 'CallExpression') {
+    else if(node.type === 'CallExpression' || node.type === 'NewExpression') {
         node.arguments = walk(node.arguments, options, trace)
         node.callee = walk(node.callee, options, trace, true)
         
@@ -126,6 +145,22 @@ function walk(node, options, trace, allowContextFunctions) {
     else if(node.type === 'VariableDeclarator') {
         node.id = walk(node.id, options, trace)
         node.init = walk(node.init, options, trace)
+    }
+    else if(node.type === 'IfStatement') {
+        node.test = walk(node.test, options, trace)
+        node.consequent = walk(node.consequent, options, trace)
+        if(node.alternate)
+            node.alternate = walk(node.alternate, options, trace)
+    }
+    else if(node.type === 'ThrowStatement') {
+        node.argument = walk(node.argument, options, trace)
+    }
+    else if(node.type === 'ObjectExpression') {
+        node.properties = walk(node.properties, options, trace)
+    }
+    else if(node.type === 'Property') {
+        node.key = walk(node.key, options, trace)
+        node.value = walk(node.value, options, trace)
     }
     else {
         console.log('unknown type\n', node, '\n', trace)
