@@ -1,0 +1,41 @@
+{
+  "name": "mytacism",
+  "version": "0.0.0-alpha",
+  "description": "Evaluates statically-analyzable expressions in Javascript",
+  "main": "lib/index.js",
+  "jsnext:main": "src/index.js",
+  "dependencies": {},
+  "peerDependencies": {
+    "recast": "^0.10.34"
+  },
+  "devDependencies": {
+    "espower-babel": "3.3.0",
+    "mocha": "2.3.3",
+    "power-assert": "1.1.0",
+    "ramda": "0.18.0"
+  },
+  "scripts": {
+    "test": "mocha --compilers js:espower-babel/guess --ui qunit --recursive test",
+    "test-watch": "mocha --growl --watch --compilers js:espower-babel/guess --ui qunit --recursive test",
+    "prepublish": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Flaise/mytacism.git"
+  },
+  "homepage": "https://github.com/Flaise/mytacism",
+  "keywords": [
+    "static",
+    "eval",
+    "analysis",
+    "static analysis",
+    "preprocessor",
+    "preprocess",
+    "evaluation"
+  ],
+  "author": {
+    "name": "Flaise",
+    "email": "x.Flaise@gmail.com"
+  },
+  "license": "MIT"
+}
