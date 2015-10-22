@@ -35,27 +35,27 @@ for(let pair of [
     '-a',
     [`-num`, '-1'],
     
-    `let a = 1`,
     [`1 + 1`, `2`],
     [`5 / 10`, `0.5`],
     [`5 * 10`, `50`],
     [`1 + 5 * 10`, `51`],
     [`5 % 2`, `1`],
     [`1 - 3`, `-2`],
-    `function r() {}`,
+    
     `a(1); b(2);`,
     [`a(1); 1 + 1;`, `a(1); 2;`],
+    ['func(1)', '2'],
+    [`func2(3, 'a')`, `"3a"`],
+    [`func2('r', 3 - 2)`, `"r1"`],
+    
     `let a = 1`,
     `var a = 1`,
     `const a = 1`,
     [`let a = func(1)`, 'let a = 2'],
     [`var a = func(1)`, 'var a = 2'],
     [`const a = func(1)`, 'const a = 2'],
-    ['func(1)', '2'],
     ['let r = func(1)', 'let r = 2'],
-    [`func2(3, 'a')`, `"3a"`],
     [`let r = func2(3, 'a')`, `let r = "3a"`],
-    [`func2('r', 3 - 2)`, `"r1"`],
     
     `if(true) {}`,
     `if(a) {}`,
@@ -81,7 +81,17 @@ for(let pair of [
     ['() => num', '() => 1'],
     'a => a',
     'num => a',
-    ['a => num', 'a => 1']
+    ['a => num', 'a => 1'],
+    
+    `function r() {}`,
+    `function a(n) {}`,
+    `function q(num) {}`,
+    `function q() { -5 }`,
+    `function q(num) { 1 }`,
+    `function q() { return 5 }`,
+    [`function q() { return 5 + 1 }`, `function q() { return 6 }`],
+    [`function q() { num }`, `function q() { 1 }`],
+    [`function q() { return -num }`, `function q() { return -1 }`]
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair

@@ -90,13 +90,16 @@ function walk(node, options, trace, allowContextFunctions) {
             }
         }
     }
-    else if(node.type === 'Literal' || node.type === 'FunctionDeclaration' || node.type === 'EmptyStatement') {
+    else if(node.type === 'Literal' || node.type === 'EmptyStatement') {
         // pass
     }
-    else if(node.type === 'File')
+    else if(node.type === 'File') {
         node.program = walk(node.program, options, trace)
-    else if(node.type === 'Program' || node.type === 'BlockStatement')
+    }
+    else if(node.type === 'Program' || node.type === 'BlockStatement'
+            || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration') {
         node.body = walk(node.body, options, trace)
+    }
     else if(node.type === 'UnaryExpression') {
         node.argument = walk(node.argument, options, trace)
         
@@ -162,8 +165,8 @@ function walk(node, options, trace, allowContextFunctions) {
         node.key = walk(node.key, options, trace)
         node.value = walk(node.value, options, trace)
     }
-    else if(node.type === 'ArrowFunctionExpression') {
-        node.body = walk(node.body, options, trace)
+    else if(node.type === 'ReturnStatement') {
+        node.argument = walk(node.argument, options, trace)
     }
     else {
         console.log('unknown type\n', node, '\n', trace)
