@@ -73,7 +73,15 @@ for(let pair of [
     '({"a": -1})',
     '({[r]: "qwer"})',
     ['( {[1 + 1]: d} )', '( {[2]: d} )'],
-    ['( {["asdf" + num]: num} )', '( {["asdf1"]: 1} )']
+    ['( {["asdf" + num]: num} )', '( {["asdf1"]: 1} )'],
+    
+    '() => {}',
+    '() => 1',
+    '() => a',
+    ['() => num', '() => 1'],
+    'a => a',
+    'num => a',
+    ['a => num', 'a => 1']
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair

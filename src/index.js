@@ -162,6 +162,9 @@ function walk(node, options, trace, allowContextFunctions) {
         node.key = walk(node.key, options, trace)
         node.value = walk(node.value, options, trace)
     }
+    else if(node.type === 'ArrowFunctionExpression') {
+        node.body = walk(node.body, options, trace)
+    }
     else {
         console.log('unknown type\n', node, '\n', trace)
     }
