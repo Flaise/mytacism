@@ -155,6 +155,16 @@ for(let pair of [
     [`({})[2 + 2] -= 3`, `({})[4] -= 3`],
     
     [`obj`, "({\n  \"x\": {\n    \"y\": 39\n  }\n})"],
+    
+    `1? a: b`,
+    [`num ? r: s`, `1 ? r: s`],
+    
+    `delete a`,
+    `delete a.a`,
+    `delete ({}).a`,
+    `delete ({}).num`,
+    `delete ({})['a']`,
+    [`delete ({})[num]`, `delete ({})[1]`]
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair
@@ -170,6 +180,8 @@ for(let [source, validator] of [
     ['func', /Compile-time function referenced but not called/],
     ['func; num;', /Compile-time function referenced but not called/],
     [`num += 1`, /Can't assign to/],
+    [`delete num`],
+    [`delete func`]
 ]) {
     test(source, () => assert.throws(() => process(source, options), validator))
 }

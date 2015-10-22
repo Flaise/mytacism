@@ -115,14 +115,23 @@ function walk(node, options, trace, allowContextFunctions) {
         node.body = walk(node.body, options, trace)
     }
     else if(node.type === 'UnaryExpression') {
-        node.argument = walk(node.argument, options, trace)
-        
-        if(node.argument.type === 'Literal') {
-            const operator = unaryOperators[node.operator]
-            if(operator)
-                return types.builders.literal(operator(node.argument.value))
-            else
-                console.warn(`Unknown unary operator "${node.operator}"`)
+        if(node.operator === 'delete') {
+            if(node.argument.type !== 'Identifier' && node.argument.type !== 'MemberExpression')
+                raiseError(node, `Can't delete ${node.argument.type}.`)
+            node.argument = walk(node.argument, options, trace)
+            if(node.argument.type === 'Literal')
+                raiseError(node, "Can't delete compile-time constant.")
+        }
+        else {
+            node.argument = walk(node.argument, options, trace)
+            
+            if(node.argument.type === 'Literal') {
+                const operator = unaryOperators[node.operator]
+                if(operator)
+                    return types.builders.literal(operator(node.argument.value))
+                else
+                    console.warn(`Unknown unary operator`, node)
+            }
         }
     }
     else if(node.type === 'BinaryExpression') {
@@ -134,7 +143,7 @@ function walk(node, options, trace, allowContextFunctions) {
             if(operator)
                 return types.builders.literal(operator(node.left.value, node.right.value))
             else
-                console.warn(`Unknown binary operator "${node.operator}"`)
+                console.warn(`Unknown binary operator`, node)
         }
     }
     else if(node.type === 'ExpressionStatement') {
@@ -163,7 +172,7 @@ function walk(node, options, trace, allowContextFunctions) {
         node.id = walk(node.id, options, trace)
         node.init = walk(node.init, options, trace)
     }
-    else if(node.type === 'IfStatement') {
+    else if(node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
         node.test = walk(node.test, options, trace)
         node.consequent = walk(node.consequent, options, trace)
         if(node.alternate)
@@ -182,7 +191,7 @@ function walk(node, options, trace, allowContextFunctions) {
     }
     else if(node.type === 'AssignmentExpression') {
         if(node.left.type !== 'Identifier' && node.left.type !== 'MemberExpression')
-            raiseError(node, `Can't assign to ${node.left.type}`)
+            raiseError(node, `Can't assign to ${node.left.type}.`)
         node.left = walk(node.left, options, trace)
         if(node.left.type === 'Literal')
             raiseError(node, "Can't assign to compile-time constant.")
