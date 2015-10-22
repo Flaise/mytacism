@@ -140,6 +140,21 @@ for(let pair of [
     [`a -= num - 3`, `a -= -2`],
     `a(r *= 3)`,
     [`if(n %= num) { b /= num / 4 }`, `if(n %= 1) { b /= 0.25 }`],
+    
+    [`({a: num})`, `({a: 1})`],
+    [`({a: {a: num}})`, `({a: {a: 1}})`],
+    `({}.r)`,
+    `({}["2"])`,
+    [`({}[num])`, `({}[1])`],
+    [`({}[num + 1])`, `({}[2])`],
+    `({}.num)`,
+    `({}.obj)`,
+    
+    `({}).a = 1`,
+    `({})["qwer"] = 1`,
+    [`({})[2 + 2] -= 3`, `({})[4] -= 3`],
+    
+    [`obj`, "({\n  \"x\": {\n    \"y\": 39\n  }\n})"],
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair
@@ -154,27 +169,10 @@ for(let pair of [
 for(let [source, validator] of [
     ['func', /Compile-time function referenced but not called/],
     ['func; num;', /Compile-time function referenced but not called/],
-    [`num += 1`, /Can't assign to compile-time constant/]
+    [`num += 1`, /Can't assign to/],
 ]) {
     test(source, () => assert.throws(() => process(source, options), validator))
 }
-
-
-function objectEquality(objCodeA, objCodeB) {
-    assert(arguments.length === 2)
-    
-    const a = eval(objCodeA)
-    assert(a && typeof a === 'object')
-    
-    const b = eval(`(${objCodeB})`)
-    assert(b && typeof b === 'object')
-    
-    assert.deepEqual(a, b)
-}
-
-test('simple substitution', () => {
-    objectEquality(process(`obj`, options).code, `{x: {y: 39}}`)
-})
 
 
 test('source maps', () => {

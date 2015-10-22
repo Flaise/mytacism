@@ -45,7 +45,7 @@ function valueToNode(value) {
 
 function raiseError(node, message) {
     message = message || 'Unknown error.'
-    message += ` (at line ${node.loc.start.line}, column ${node.loc.start.column})`
+    message += ` (line ${node.loc.start.line}, column ${node.loc.start.column})`
     const error = new Error(message)
     error.line = node.loc.start.line
     error.column = node.loc.start.column
@@ -181,13 +181,18 @@ function walk(node, options, trace, allowContextFunctions) {
         node.value = walk(node.value, options, trace)
     }
     else if(node.type === 'AssignmentExpression') {
-        if(node.left.type !== 'Identifier')
-            raiseError(node, "Can't assign to non-identifier.")
+        if(node.left.type !== 'Identifier' && node.left.type !== 'MemberExpression')
+            raiseError(node, `Can't assign to ${node.left.type}`)
         node.left = walk(node.left, options, trace)
-        if(node.left.type !== 'Identifier')
+        if(node.left.type === 'Literal')
             raiseError(node, "Can't assign to compile-time constant.")
         
         node.right = walk(node.right, options, trace)
+    }
+    else if(node.type === 'MemberExpression') {
+        node.object = walk(node.object, options, trace)
+        if(node.computed)
+            node.property = walk(node.property, options, trace)
     }
     else {
         console.log('unknown type\n', node, '\n', trace)
