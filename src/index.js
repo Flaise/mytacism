@@ -97,7 +97,8 @@ function walk(node, options, trace, allowContextFunctions) {
         node.program = walk(node.program, options, trace)
     }
     else if(node.type === 'Program' || node.type === 'BlockStatement'
-            || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration') {
+            || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration'
+            || node.type === 'FunctionExpression') {
         node.body = walk(node.body, options, trace)
     }
     else if(node.type === 'UnaryExpression') {
@@ -155,7 +156,8 @@ function walk(node, options, trace, allowContextFunctions) {
         if(node.alternate)
             node.alternate = walk(node.alternate, options, trace)
     }
-    else if(node.type === 'ThrowStatement') {
+    else if(node.type === 'ThrowStatement' || node.type === 'ReturnStatement'
+            || node.type === 'YieldExpression') {
         node.argument = walk(node.argument, options, trace)
     }
     else if(node.type === 'ObjectExpression') {
@@ -164,9 +166,6 @@ function walk(node, options, trace, allowContextFunctions) {
     else if(node.type === 'Property') {
         node.key = walk(node.key, options, trace)
         node.value = walk(node.value, options, trace)
-    }
-    else if(node.type === 'ReturnStatement') {
-        node.argument = walk(node.argument, options, trace)
     }
     else {
         console.log('unknown type\n', node, '\n', trace)

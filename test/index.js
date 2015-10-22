@@ -91,7 +91,28 @@ for(let pair of [
     `function q() { return 5 }`,
     [`function q() { return 5 + 1 }`, `function q() { return 6 }`],
     [`function q() { num }`, `function q() { 1 }`],
-    [`function q() { return -num }`, `function q() { return -1 }`]
+    [`function q() { return -num }`, `function q() { return -1 }`],
+    `let q = function q() {}`,
+    `let q = function() {}`,
+    [`let q = function() { return num + 1 }`, `let q = function() { return 2 }`],
+    
+    `function* r() {}`,
+    `function* a(n) {}`,
+    `function* q(num) {}`,
+    `function* q() { -5 }`,
+    `function* q(num) { 1 }`,
+    `function* q() { return 5 }`,
+    [`function* q() { return 5 + 1 }`, `function* q() { return 6 }`],
+    [`function* q() { num }`, `function* q() { 1 }`],
+    [`function* q() { return -num }`, `function* q() { return -1 }`],
+    `let q = function* q() {}`,
+    `let q = function*() {}`,
+    [`let q = function*() { return num + 1 }`, `let q = function*() { return 2 }`],
+    
+    `function* r() { yield 3 }`,
+    [`function* r() { yield 3 - num }`, `function* r() { yield 2 }`],
+    `function* r() { return yield "asdf" }`,
+    [`function* r() { return yield "asdf" + num }`, `function* r() { return yield "asdf1" }`],
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair

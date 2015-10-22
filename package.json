@@ -16,7 +16,7 @@
   },
   "scripts": {
     "test": "mocha --reporter dot --compilers js:espower-babel/guess --ui qunit --recursive test",
-    "test-watch": "mocha --growl --watch --reporter dot --compilers js:espower-babel/guess --ui qunit --recursive test",
+    "test-watch": "mocha --growl --watch --reporter min --compilers js:espower-babel/guess --ui qunit --recursive test",
     "prepublish": "npm test && npm run build",
     "build": "babel src --out-dir lib --source-maps"
   },
