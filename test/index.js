@@ -62,8 +62,23 @@ for(let pair of [
     
     `if(true) {}`,
     `if(a) {}`,
+    
     [`if(num === 1) {}`, `if(true) {}`],
     [`if(num !== 1) { throw new Error() }`, `if(false) { throw new Error() }`],
+    [`if(num == 1) {}`, `if(true) {}`],
+    [`if(num != 1) { throw new Error() }`, `if(false) { throw new Error() }`],
+    
+    `if(a === 1) {}`,
+    `if(a !== 1) { throw new Error() }`,
+    `if(a == 1) {}`,
+    `if(a != 1) { throw new Error() }`,
+    
+    `a > b`,
+    [`num > b`, `1 > b`],
+    [`num > 10`, `false`],
+    [`num < 2`, `true`],
+    [`num + num >= 2`, `true`],
+    
     'if(true);else;',
     'if(false){} else {;}',
     `;`,
@@ -138,9 +153,10 @@ for(let pair of [
 
 for(let [source, validator] of [
     ['func', /Compile-time function referenced but not called/],
-    ['func; num;', /Compile-time function referenced but not called/]
+    ['func; num;', /Compile-time function referenced but not called/],
+    [`num += 1`, /Can't assign to compile-time constant/]
 ]) {
-    assert.throws(() => process(source, options), validator)
+    test(source, () => assert.throws(() => process(source, options), validator))
 }
 
 

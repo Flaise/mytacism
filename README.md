@@ -1,7 +1,8 @@
 Mytacism
 ---
 
-Evaluates statically analyzable expressions in Javascript. Inspired by
+Evaluates statically analyzable expressions in Javascript and can evaluate injected compile-time
+constants and functions. Inspired by
 [static-eval](https://github.com/substack/static-eval), which at the time of writing was a promising
 but incomplete solution.
 

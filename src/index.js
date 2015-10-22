@@ -14,7 +14,12 @@ const binaryOperators = {
     '*': (a, b) => a * b,
     '%': (a, b) => a % b,
     '===': (a, b) => a === b,
-    '!==': (a, b) => a !== b
+    '!==': (a, b) => a !== b,
+    '==': (a, b) => a == b,
+    '!=': (a, b) => a != b,
+    '>': (a, b) => a > b,
+    '<': (a, b) => a < b,
+    '>=': (a, b) => a >= b
 }
 const unaryOperators = {
     '+': (a => +a),
@@ -38,6 +43,15 @@ function valueToNode(value) {
     }
 }
 
+function raiseError(node, message) {
+    message = message || 'Unknown error.'
+    message += ` (at line ${node.loc.start.line}, column ${node.loc.start.column})`
+    const error = new Error(message)
+    error.line = node.loc.start.line
+    error.column = node.loc.start.column
+    throw error
+}
+
 const FAIL = {}
 
 function contextValueToNode(node, options, allowFunctions) {
@@ -48,8 +62,7 @@ function contextValueToNode(node, options, allowFunctions) {
         if(allowFunctions)
             return FAIL
         else
-            throw new Error(`Compile-time function referenced but not called at line ` +
-                            `${node.loc.start.line}, column ${node.loc.start.column}`)
+            raiseError(node, 'Compile-time function referenced but not called.')
     }
     return valueToNode(result)
 }
@@ -168,6 +181,12 @@ function walk(node, options, trace, allowContextFunctions) {
         node.value = walk(node.value, options, trace)
     }
     else if(node.type === 'AssignmentExpression') {
+        if(node.left.type !== 'Identifier')
+            raiseError(node, "Can't assign to non-identifier.")
+        node.left = walk(node.left, options, trace)
+        if(node.left.type !== 'Identifier')
+            raiseError(node, "Can't assign to compile-time constant.")
+        
         node.right = walk(node.right, options, trace)
     }
     else {
