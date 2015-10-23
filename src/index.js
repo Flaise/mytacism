@@ -1,4 +1,6 @@
 import {parse, print, types} from 'recast'
+import binaryExpression from './binary-expression'
+import logicalExpression from './logical-expression'
 
 export default function process(code, options) {
     options = options || {}
@@ -7,73 +9,8 @@ export default function process(code, options) {
     return print(ast, options)
 }
 
-function normalBinaryOperator(func) {
-    return (node, options, trace) => {
-        node.left = walk(node.left, options, trace)
-        node.right = walk(node.right, options, trace)
-        
-        if(node.left.type === 'Literal' && node.right.type === 'Literal')
-            return types.builders.literal(func(node.left.value, node.right.value))
-        
-        return node
-    }
-}
-
 const FAIL = {}
 
-function shortcutBinaryOperator(funcLeft, funcRight, func2) {
-    return (node, options, trace) => {
-        node.left = walk(node.left, options, trace)
-        node.right = walk(node.right, options, trace)
-        
-        if(node.left.type === 'Literal' && node.right.type === 'Literal')
-            return types.builders.literal(func2(node.left.value, node.right.value))
-        
-        let leftValue = FAIL
-        
-        if(node.left.type === 'Literal') {
-            leftValue = funcLeft(node.left.value)
-            if(leftValue !== FAIL)
-                return types.builders.literal(leftValue)
-        }
-        
-        if(node.right.type === 'Literal') {
-            const result = funcRight(node.right.value)
-            if(result === FAIL) {
-                return node.left
-            }
-            return types.builders.literal(result)
-        }
-        else if(leftValue === FAIL) {
-            return node.right
-        }
-        
-        return node
-    }
-}
-
-const binaryOperators = {
-    BinaryExpression: {
-        '+': normalBinaryOperator((a, b) => a + b),
-        '-': normalBinaryOperator((a, b) => a - b),
-        '/': normalBinaryOperator((a, b) => a / b),
-        '*': normalBinaryOperator((a, b) => a * b),
-        '%': normalBinaryOperator((a, b) => a % b),
-        '===': normalBinaryOperator((a, b) => a === b),
-        '!==': normalBinaryOperator((a, b) => a !== b),
-        '==': normalBinaryOperator((a, b) => a == b),
-        '!=': normalBinaryOperator((a, b) => a != b),
-        '>': normalBinaryOperator((a, b) => a > b),
-        '<': normalBinaryOperator((a, b) => a < b),
-        '>=': normalBinaryOperator((a, b) => a >= b),
-        '&': normalBinaryOperator((a, b) => a & b),
-        '^': normalBinaryOperator((a, b) => a ^ b),
-    },
-    LogicalExpression: {
-        '||': shortcutBinaryOperator((a => a? a: FAIL), (a => a? a: FAIL), ((a, b) => a || b)),
-        '&&': shortcutBinaryOperator((a => a? FAIL: a), (a => a), ((a, b) => a && b)),
-    }
-}
 const unaryOperators = {
     '+': (a => +a),
     '-': (a => -a),
@@ -86,11 +23,9 @@ function valueToNode(value) {
     if(value && typeof value === 'object') {
         const nodes = []
         for(let key of Object.keys(value)) {
-            nodes.push(types.builders.property(
-                'init',
-                types.builders.literal(key),
-                valueToNode(value[key])
-            ))
+            nodes.push(types.builders.property('init',
+                                               types.builders.literal(key),
+                                               valueToNode(value[key])))
         }
         return types.builders.objectExpression(nodes)
     }
@@ -214,12 +149,15 @@ function walk(node, options, trace, allowContextFunctions) {
         if(node.argument.type === 'Literal')
             raiseError(node, "Can't mutate compile-time constant or literal. Assign a copy to a variable first.")
     }
-    else if(node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
-        const operator = binaryOperators[node.type][node.operator]
-        if(operator)
-            return operator(node, options, trace)
-        else
-            console.warn('Unknown binary operator', node)
+    else if(node.type === 'BinaryExpression') {
+        node.left = walk(node.left, options, trace)
+        node.right = walk(node.right, options, trace)
+        return binaryExpression(node)
+    }
+    else if(node.type === 'LogicalExpression') {
+        node.left = walk(node.left, options, trace)
+        node.right = walk(node.right, options, trace)
+        return logicalExpression(node)
     }
     else if(node.type === 'ExpressionStatement') {
         node.expression = walk(node.expression, options, trace)
