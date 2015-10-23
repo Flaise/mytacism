@@ -103,7 +103,8 @@ function walk(node, options, trace, allowContextFunctions) {
             }
         }
     }
-    else if(node.type === 'Literal' || node.type === 'EmptyStatement') {
+    else if(node.type === 'Literal' || node.type === 'EmptyStatement'
+            || node.type === 'ImportDeclaration') {
         // pass
     }
     else if(node.type === 'File') {
@@ -119,8 +120,13 @@ function walk(node, options, trace, allowContextFunctions) {
             if(node.argument.type !== 'Identifier' && node.argument.type !== 'MemberExpression')
                 raiseError(node, `Can't delete ${node.argument.type}.`)
             node.argument = walk(node.argument, options, trace)
-            if(node.argument.type === 'Literal')
+            if(node.argument.type === 'Literal' || node.argument.type === 'ObjectExpression')
                 raiseError(node, "Can't delete compile-time constant.")
+            if(node.argument.type === 'MemberExpression') {
+                const obj = node.argument.object
+                if(obj.type === 'Literal' || obj.type === 'ObjectExpression' || obj.type === 'ArrayExpression')
+                    raiseError(node, "Can't mutate compile-time constant or literal. Assign a copy to a variable first.")
+            }
         }
         else {
             node.argument = walk(node.argument, options, trace)
@@ -202,6 +208,9 @@ function walk(node, options, trace, allowContextFunctions) {
         node.object = walk(node.object, options, trace)
         if(node.computed)
             node.property = walk(node.property, options, trace)
+    }
+    else if(node.type === 'ArrayExpression') {
+        node.elements = walk(node.elements, options, trace)
     }
     else {
         console.log('unknown type\n', node, '\n', trace)

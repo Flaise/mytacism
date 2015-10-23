@@ -11,6 +11,8 @@ const options = Object.freeze({
         func: (a) => a + 1,
         func2: (a, b) => a + b,
         obj: {x: {y: 39}},
+        arr: [9, 'a'],
+        str: "red",
         macro: (a) => `if(${a}) { ${a} += 1 }`
     }
 })
@@ -44,6 +46,11 @@ for(let pair of [
     [`1 + 5 * 10`, `51`],
     [`5 % 2`, `1`],
     [`1 - 3`, `-2`],
+    
+    [`num + 1`, `2`],
+    [`str + 1`, `"red1"`],
+    [`str + "a"`, `"reda"`],
+    [`str + num`, `"red1"`],
     
     `a(1); b(2);`,
     [`a(1); 1 + 1;`, `a(1); 2;`],
@@ -161,10 +168,25 @@ for(let pair of [
     
     `delete a`,
     `delete a.a`,
-    `delete ({}).a`,
-    `delete ({}).num`,
-    `delete ({})['a']`,
-    [`delete ({})[num]`, `delete ({})[1]`]
+    `delete a[1]`,
+    [`delete a[num]`, `delete a[1]`],
+    
+    `[]`,
+    `[b, r, 3, 0.25]`,
+    [`[num]`, `[1]`],
+    [`[1 + 1, 3]`, `[2, 3]`],
+    
+    [`func(num)`, `2`],
+    [`func2(str, num)`, `"red1"`],
+    [`func2(func(str), -num)`, `"red1-1"`],
+    
+    `import 'y'`,
+    `import * as y from 'y'`,
+    `import y from 'y'`,
+    `import {a} from 'y'`,
+    ` import {a, b} from 'y'`,
+    `import {a as b} from 'y'`,
+    `import {default as fault} from 'y'`,
 ]) {
     if(Array.isArray(pair)) {
         const [source, expectation] = pair
@@ -180,8 +202,16 @@ for(let [source, validator] of [
     ['func', /Compile-time function referenced but not called/],
     ['func; num;', /Compile-time function referenced but not called/],
     [`num += 1`, /Can't assign to/],
-    [`delete num`],
-    [`delete func`]
+    [`delete num`, /Can't delete/],
+    [`delete func`],
+    [`delete num.a`],
+    [`delete obj`, /Can't delete/],
+    [`delete obj.a`, /Can't mutate/],
+    [`delete obj[1]`, /Can't mutate/],
+    [`delete arr`, /Can't delete/],
+    [`delete arr.a`, /Can't mutate/],
+    [`delete arr[1]`, /Can't mutate/],
+    [`delete arr[num]`, /Can't mutate/]
 ]) {
     test(source, () => assert.throws(() => process(source, options), validator))
 }
