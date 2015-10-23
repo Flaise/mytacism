@@ -7,24 +7,80 @@ export default function process(code, options) {
     return print(ast, options)
 }
 
+function normalBinaryOperator(func) {
+    return (node, options, trace) => {
+        node.left = walk(node.left, options, trace)
+        node.right = walk(node.right, options, trace)
+        
+        if(node.left.type === 'Literal' && node.right.type === 'Literal')
+            return types.builders.literal(func(node.left.value, node.right.value))
+        
+        return node
+    }
+}
+
+const FAIL = {}
+
+function shortcutBinaryOperator(funcLeft, funcRight, func2) {
+    return (node, options, trace) => {
+        node.left = walk(node.left, options, trace)
+        node.right = walk(node.right, options, trace)
+        
+        if(node.left.type === 'Literal' && node.right.type === 'Literal')
+            return types.builders.literal(func2(node.left.value, node.right.value))
+        
+        let leftValue = FAIL
+        
+        if(node.left.type === 'Literal') {
+            leftValue = funcLeft(node.left.value)
+            if(leftValue !== FAIL)
+                return types.builders.literal(leftValue)
+        }
+        
+        if(node.right.type === 'Literal') {
+            const result = funcRight(node.right.value)
+            if(result === FAIL) {
+                return node.left
+            }
+            return types.builders.literal(result)
+        }
+        else if(leftValue === FAIL) {
+            return node.right
+        }
+        
+        return node
+    }
+}
+
 const binaryOperators = {
-    '+': (a, b) => a + b,
-    '-': (a, b) => a - b,
-    '/': (a, b) => a / b,
-    '*': (a, b) => a * b,
-    '%': (a, b) => a % b,
-    '===': (a, b) => a === b,
-    '!==': (a, b) => a !== b,
-    '==': (a, b) => a == b,
-    '!=': (a, b) => a != b,
-    '>': (a, b) => a > b,
-    '<': (a, b) => a < b,
-    '>=': (a, b) => a >= b
+    BinaryExpression: {
+        '+': normalBinaryOperator((a, b) => a + b),
+        '-': normalBinaryOperator((a, b) => a - b),
+        '/': normalBinaryOperator((a, b) => a / b),
+        '*': normalBinaryOperator((a, b) => a * b),
+        '%': normalBinaryOperator((a, b) => a % b),
+        '===': normalBinaryOperator((a, b) => a === b),
+        '!==': normalBinaryOperator((a, b) => a !== b),
+        '==': normalBinaryOperator((a, b) => a == b),
+        '!=': normalBinaryOperator((a, b) => a != b),
+        '>': normalBinaryOperator((a, b) => a > b),
+        '<': normalBinaryOperator((a, b) => a < b),
+        '>=': normalBinaryOperator((a, b) => a >= b),
+        '&': normalBinaryOperator((a, b) => a & b),
+        '^': normalBinaryOperator((a, b) => a ^ b),
+    },
+    LogicalExpression: {
+        '||': shortcutBinaryOperator((a => a? a: FAIL), (a => a? a: FAIL), ((a, b) => a || b)),
+        '&&': shortcutBinaryOperator((a => a? FAIL: a), (a => a), ((a, b) => a && b)),
+    }
 }
 const unaryOperators = {
     '+': (a => +a),
-    '-': (a => -a)
+    '-': (a => -a),
+    '~': (a => ~a),
+    '!': (a => !a),
 }
+
 
 function valueToNode(value) {
     if(value && typeof value === 'object') {
@@ -51,8 +107,6 @@ function raiseError(node, message) {
     error.column = node.loc.start.column
     throw error
 }
-
-const FAIL = {}
 
 function contextValueToNode(node, options, allowFunctions) {
     if(!options.context || !Object.prototype.hasOwnProperty.call(options.context, node.name))
@@ -94,17 +148,31 @@ function walk(node, options, trace, allowContextFunctions) {
     if(Array.isArray(node)) {
         for(let i = 0; i < node.length; i += 1) {
             const result = walk(node[i], options, trace)
-            if(result) {
-                node[i] = result
-            }
-            else {
+            if(!result) {
                 node.splice(i, 1)
                 i -= 1
             }
+            else if(Array.isArray(result.body)) {
+                if(result.body.length === 0) {
+                    node.splice(i, 1)
+                    i -= 1
+                }
+                else if(result.body.length === 1) {
+                    node[i] = result.body[0]
+                }
+                else {
+                    node[i] = result
+                }
+            }
+            else {
+                node[i] = result
+            }
         }
     }
-    else if(node.type === 'Literal' || node.type === 'EmptyStatement'
-            || node.type === 'ImportDeclaration') {
+    else if(node.type === 'EmptyStatement') {
+        return undefined
+    }
+    else if(node.type === 'Literal' || node.type === 'ImportDeclaration') {
         // pass
     }
     else if(node.type === 'File') {
@@ -140,17 +208,18 @@ function walk(node, options, trace, allowContextFunctions) {
             }
         }
     }
-    else if(node.type === 'BinaryExpression') {
-        node.left = walk(node.left, options, trace)
-        node.right = walk(node.right, options, trace)
+    else if(node.type === 'UpdateExpression') {
+        node.argument = walk(node.argument, options, trace)
         
-        if(node.left.type === 'Literal' && node.right.type === 'Literal') {
-            const operator = binaryOperators[node.operator]
-            if(operator)
-                return types.builders.literal(operator(node.left.value, node.right.value))
-            else
-                console.warn(`Unknown binary operator`, node)
-        }
+        if(node.argument.type === 'Literal')
+            raiseError(node, "Can't mutate compile-time constant or literal. Assign a copy to a variable first.")
+    }
+    else if(node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+        const operator = binaryOperators[node.type][node.operator]
+        if(operator)
+            return operator(node, options, trace)
+        else
+            console.warn('Unknown binary operator', node)
     }
     else if(node.type === 'ExpressionStatement') {
         node.expression = walk(node.expression, options, trace)
@@ -176,17 +245,29 @@ function walk(node, options, trace, allowContextFunctions) {
     }
     else if(node.type === 'VariableDeclarator') {
         node.id = walk(node.id, options, trace)
-        node.init = walk(node.init, options, trace)
+        if(node.init)
+            node.init = walk(node.init, options, trace)
     }
     else if(node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
         node.test = walk(node.test, options, trace)
-        node.consequent = walk(node.consequent, options, trace)
+        if(node.consequent.type !== 'EmptyStatement') // keeps original source map
+            node.consequent = walk(node.consequent, options, trace)
         if(node.alternate)
             node.alternate = walk(node.alternate, options, trace)
+            
+        if(node.test.type === 'Literal') {
+            if(node.test.value)
+                return node.consequent
+            else
+                return node.alternate
+        }
     }
-    else if(node.type === 'ThrowStatement' || node.type === 'ReturnStatement'
-            || node.type === 'YieldExpression') {
+    else if(node.type === 'ThrowStatement' || node.type === 'YieldExpression') {
         node.argument = walk(node.argument, options, trace)
+    }
+    else if(node.type === 'ReturnStatement') {
+        if(node.argument)
+            node.argument = walk(node.argument, options, trace)
     }
     else if(node.type === 'ObjectExpression') {
         node.properties = walk(node.properties, options, trace)
@@ -211,6 +292,12 @@ function walk(node, options, trace, allowContextFunctions) {
     }
     else if(node.type === 'ArrayExpression') {
         node.elements = walk(node.elements, options, trace)
+    }
+    else if(node.type === 'ForStatement') {
+        node.init = walk(node.init, options, trace)
+        node.test = walk(node.test, options, trace)
+        node.update = walk(node.update, options, trace)
+        node.body = walk(node.body, options, trace)
     }
     else {
         console.log('unknown type\n', node, '\n', trace)

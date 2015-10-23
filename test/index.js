@@ -67,13 +67,18 @@ for(let pair of [
     ['let r = func(1)', 'let r = 2'],
     [`let r = func2(3, 'a')`, `let r = "3a"`],
     
-    `if(true) {}`,
+    [`{}`, ``],
+    [`;`, ``],
+    [`;;`, ``],
+    
+    [`if(true) {}`, ``],
+    [`if( true )  ;`, ``],
     `if(a) {}`,
     
-    [`if(num === 1) {}`, `if(true) {}`],
-    [`if(num !== 1) { throw new Error() }`, `if(false) { throw new Error() }`],
-    [`if(num == 1) {}`, `if(true) {}`],
-    [`if(num != 1) { throw new Error() }`, `if(false) { throw new Error() }`],
+    [`if(num === 1) a`, `a`],
+    [`if(num !== 2 && a) { throw new Error() }`, `if(a) { throw new Error() }`],
+    [`if(num == 1) { a }`, `a`],
+    [`if(num != 1 || a) { throw new Error() }`, `if(a) { throw new Error() }`],
     
     `if(a === 1) {}`,
     `if(a !== 1) { throw new Error() }`,
@@ -86,9 +91,16 @@ for(let pair of [
     [`num < 2`, `true`],
     [`num + num >= 2`, `true`],
     
-    'if(true);else;',
-    'if(false){} else {;}',
-    `;`,
+    // NOTE: This might be a bug in recast@0.10.34 - it's supposed to preserve formatting
+    ['if(a);else;', "if (a)\n  ;"],
+    
+    `if(a);else a;`,
+    ['if(a){} else {;}', 'if(a){} else {}'],
+    
+    [`if(true) 1;`, `1;`],
+    [`if(false) 1;`, ``],
+    [`true? 1: 0`, `1`],
+    [`false? 1: 0`, `0`],
     
     `({})`,
     `({a: 2})`,
@@ -163,8 +175,8 @@ for(let pair of [
     
     [`obj`, "({\n  \"x\": {\n    \"y\": 39\n  }\n})"],
     
-    `1? a: b`,
-    [`num ? r: s`, `1 ? r: s`],
+    `q? a: b`,
+    [`num + a ? r: s`, `1 + a ? r: s`],
     
     `delete a`,
     `delete a.a`,
@@ -187,15 +199,54 @@ for(let pair of [
     ` import {a, b} from 'y'`,
     `import {a as b} from 'y'`,
     `import {default as fault} from 'y'`,
+    
+    `if(a) { import 'y' }`,
+    [`if(num) { import 'y' }`, `import 'y'`],
+    
+    `return`,
+    `return 1`,
+    [`return num`, `return 1`],
+    
+    `~a`,
+    [`~1`, `-2`],
+    `a ^ b`,
+    `a ^ 9`,
+    [`num ^ 3`, `2`],
+    [`num & 2`, `0`],
+    [`num & 3`, `1`],
+    [`0 ||str`, `"red"`],
+    
+    [`a && false`, `false`],
+    [`a && true`, `true`],
+    [`1 && false`, String(1 && false)],
+    [`1 && true`, String(1 && true)],
+    [`0 && false`, String(0 && false)],
+    [`0 && true`, String(0 && true)],
+    
+    `!a`,
+    [`!true`, `false`],
+    [`!num`, `false`],
+    
+    `for(let i = 0; i < r.length; i += 1) {}`,
+    `for(let i = 0; i < r.length; i++) {}`,
+    `for(let i = r.length - 1; i >= 0; i -= 1) {}`,
+    `for(let i = r.length - 1; i >= 0; i--) {}`,
+    [`for(let i = num; i < num; i += num) {}`, `for(let i = 1; i < 1; i += 1) {}`],
+    
+    `let i;`,
+    `var i`,
+    `const i = 1`,
 ]) {
+    let source, expectation
     if(Array.isArray(pair)) {
-        const [source, expectation] = pair
-        test(source, () => assert(process(source, options).code === expectation))
+        ;[source, expectation] = pair
     }
     else {
-        const source = pair
-        test(source, () => assert(process(source, options).code === source))
+        ;[source, expectation] = [pair, pair]
     }
+    const result = process(source, options).code.trim()
+    expectation = expectation.trim()
+    test(`[   ${source}   ] `, () => assert(result === expectation))
 }
 
 for(let [source, validator] of [
@@ -211,7 +262,11 @@ for(let [source, validator] of [
     [`delete arr`, /Can't delete/],
     [`delete arr.a`, /Can't mutate/],
     [`delete arr[1]`, /Can't mutate/],
-    [`delete arr[num]`, /Can't mutate/]
+    [`delete arr[num]`, /Can't mutate/],
+    [`num++`, /Can't mutate/],
+    [`num--`, /Can't mutate/],
+    [`++num`, /Can't mutate/],
+    [`--num`, /Can't mutate/],
 ]) {
     test(source, () => assert.throws(() => process(source, options), validator))
 }
