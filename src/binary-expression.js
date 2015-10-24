@@ -6,7 +6,6 @@ export default function(node) {
 
 function normalBinaryOperator(func) {
     return (node) => {
-        console.log(node)
         if(node.left.type === 'Literal' && node.right.type === 'Literal')
             return types.builders.literal(func(node.left.value, node.right.value))
         

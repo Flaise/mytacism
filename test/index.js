@@ -5,15 +5,20 @@ import {merge} from 'ramda'
 
 suite('mytacism')
 
+
 const options = Object.freeze({
-    context: {
+    values: {
         num: 1,
-        func: (a) => a + 1,
-        func2: (a, b) => a + b,
         obj: {x: {y: 39}},
         arr: [9, 'a'],
         str: "red",
-        macro: (a) => `if(${a}) { ${a} += 1 }`
+    },
+    functions: {
+        func: (a) => a + 1,
+        func2: (a, b) => a + b,
+    },
+    macroes: {
+        mac: (a) => `if(${a}) { ${a} += 1 }`
     }
 })
 
@@ -202,6 +207,7 @@ for(let pair of [
     
     `if(a) { import 'y' }`,
     [`if(num) { import 'y' }`, `import 'y'`],
+    [`if(num === 0) { import 'y' }`, ``],
     
     `return`,
     `return 1`,
@@ -236,6 +242,8 @@ for(let pair of [
     `let i;`,
     `var i`,
     `const i = 1`,
+    
+    // [`mac(r)`, `if(r) { r += 1 }`]
 ]) {
     let source, expectation
     if(Array.isArray(pair)) {
@@ -267,6 +275,8 @@ for(let [source, validator] of [
     [`num--`, /Can't mutate/],
     [`++num`, /Can't mutate/],
     [`--num`, /Can't mutate/],
+    // [`mac(num)`, /Can't mutate/],
+    // [`func(a)`, /Can't evaluate/],
 ]) {
     test(source, () => assert.throws(() => process(source, options), validator))
 }

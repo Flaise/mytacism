@@ -4,15 +4,16 @@
   "description": "Evaluates statically-analyzable expressions in Javascript",
   "main": "lib/index.js",
   "jsnext:main": "src/index.js",
-  "dependencies": {},
+  "dependencies": {
+    "ramda": "0.18.0"
+  },
   "peerDependencies": {
     "recast": "^0.10.34"
   },
   "devDependencies": {
     "espower-babel": "3.3.0",
     "mocha": "2.3.3",
-    "power-assert": "1.1.0",
-    "ramda": "0.18.0"
+    "power-assert": "1.1.0"
   },
   "scripts": {
     "test": "mocha --reporter dot --compilers js:espower-babel/guess --ui qunit --recursive test",
