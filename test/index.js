@@ -12,6 +12,7 @@ const options = Object.freeze({
         obj: {x: {y: 39}},
         arr: [9, 'a'],
         str: "red",
+        shallowHash: {a: 1, b: 2},
     },
     functions: {
         func: (a) => a + 1,
@@ -243,6 +244,18 @@ for(let pair of [
     `var i`,
     `const i = 1`,
     
+    [`func('')`, `"1"`],
+    [`func({})`, `"${String({} + 1)}"`],
+    [`obj.x.y`, `39`],
+    [`arr[0]`, `9`],
+    [`arr[1]`, `"a"`],
+    [`arr`, `[9, "a"]`],
+    [`shallowHash.a`, `1`],
+    [`shallowHash["a"]`, `1`],
+    [`[4][0]`, `4`],
+    [`[4, 3].length`, `2`],
+    // [`shallowHash.c`, ]
+    
     // [`mac(r)`, `if(r) { r += 1 }`]
 ]) {
     let source, expectation
@@ -275,10 +288,12 @@ for(let [source, validator] of [
     [`num--`, /Can't mutate/],
     [`++num`, /Can't mutate/],
     [`--num`, /Can't mutate/],
+    [`a.1`],
+    [`arr.1`],
     // [`mac(num)`, /Can't mutate/],
     // [`func(a)`, /Can't evaluate/],
 ]) {
-    test(source, () => assert.throws(() => process(source, options), validator))
+    test(`[   ${source}   ] `, () => assert.throws(() => process(source, options), validator))
 }
 
 

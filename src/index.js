@@ -21,7 +21,10 @@ const unaryOperators = {
 }
 
 function valueToNode(value) {
-    if(value && typeof value === 'object') {
+    if(Array.isArray(value)) {
+        return types.builders.arrayExpression(value.map(a => valueToNode(a)))
+    }
+    else if(value && typeof value === 'object') {
         const nodes = []
         for(let key of Object.keys(value)) {
             nodes.push(types.builders.property('init',
@@ -62,12 +65,43 @@ function contextValue(node, context) {
     return context[node.name]
 }
 
+function literalToValue(node) {
+    if(node.type === 'Literal')
+        return node.value
+    else if(node.type === 'ObjectExpression') {
+        const result = {}
+        for(let prop of node.properties) {
+            const key = literalToValue(prop.key)
+            if(key === FAIL)
+                return FAIL
+            const value = literalToValue(prop.value)
+            if(value === FAIL)
+                return FAIL
+            result[key] = value
+        }
+        return result
+    }
+    else if(node.type === 'ArrayExpression') {
+        const result = []
+        for(let element of node.elements) {
+            const value = literalToValue(element)
+            if(value === FAIL)
+                return FAIL
+            result.push(value)
+        }
+        return result
+    }
+    else
+        return FAIL
+}
+
 function literalsToValues(nodes) {
     const result = []
     for(let node of nodes) {
-        if(node.type !== 'Literal')
+        const value = literalToValue(node)
+        if(value === FAIL)
             return FAIL
-        result.push(node.value)
+        result.push(value)
     }
     return result
 }
@@ -115,8 +149,15 @@ function walk(node, values, functions, macroes) {
         if(node.operator === 'delete') {
             if(node.argument.type !== 'Identifier' && node.argument.type !== 'MemberExpression')
                 raiseError(node, `Can't delete ${node.argument.type}.`)
-            node.argument = walk(node.argument, values, functions, macroes)
-            if(node.argument.type === 'Literal' || node.argument.type === 'ObjectExpression')
+            if(node.argument.type === 'MemberExpression') {
+                node.argument.object = walk(node.argument.object, values, functions, macroes)
+                node.argument.property = walk(node.argument.property, values, functions, macroes)
+            }
+            else {
+                node.argument = walk(node.argument, values, functions, macroes)
+            }
+            if(node.argument.type === 'Literal' || node.argument.type === 'ObjectExpression'
+                    || node.argument.type === 'ArrayExpression')
                 raiseError(node, "Can't delete compile-time constant.")
             if(node.argument.type === 'MemberExpression') {
                 const obj = node.argument.object
@@ -174,6 +215,23 @@ function walk(node, values, functions, macroes) {
             return valueToNode(func(...args))
         }
     }
+    else if(node.type === 'MemberExpression') {
+        node.object = walk(node.object, values, functions, macroes)
+        if(node.computed)
+            node.property = walk(node.property, values, functions, macroes)
+        
+        let name = FAIL
+        if(node.property.type === 'Literal')
+            name = node.property.value
+        else if(node.property.type === 'Identifier')
+            name = node.property.name
+        
+        if(name !== FAIL) {
+            const obj = literalToValue(node.object)
+            if(obj !== FAIL && Object.prototype.hasOwnProperty.call(obj, name))
+                return valueToNode(obj[name])
+        }
+    }
     else if(node.type === 'VariableDeclaration') {
         node.declarations = walk(node.declarations, values, functions, macroes)
     }
@@ -218,11 +276,6 @@ function walk(node, values, functions, macroes) {
             raiseError(node, "Can't assign to compile-time constant.")
         
         node.right = walk(node.right, values, functions, macroes)
-    }
-    else if(node.type === 'MemberExpression') {
-        node.object = walk(node.object, values, functions, macroes)
-        if(node.computed)
-            node.property = walk(node.property, values, functions, macroes)
     }
     else if(node.type === 'ArrayExpression') {
         node.elements = walk(node.elements, values, functions, macroes)
