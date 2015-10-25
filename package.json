@@ -4,12 +4,12 @@
   "description": "Evaluates statically-analyzable expressions in Javascript",
   "main": "lib/index.js",
   "jsnext:main": "src/index.js",
-  "dependencies": {
-  },
+  "dependencies": {},
   "peerDependencies": {
     "recast": "^0.10.34"
   },
   "devDependencies": {
+    "babel": "5.8.29",
     "espower-babel": "3.3.0",
     "mocha": "2.3.3",
     "power-assert": "1.1.0",

@@ -7,13 +7,13 @@ const inSource = fs.readFileSync(inFile).toString()
 const options = {
     sourceFileName: inFile,
     sourceMapName: `${inFile}.map`,
-    context: {}
+    values: {}
 }
 
-options.context.PRODUCTION = true
+options.values.PRODUCTION = true
 const outProduction = process(inSource, options)
 
-options.context.PRODUCTION = false
+options.values.PRODUCTION = false
 const outDevelopment = process(inSource, options)
 
 fs.writeFileSync(__dirname + '/output.production.js', outProduction.code)

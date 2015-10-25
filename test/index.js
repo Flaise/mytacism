@@ -216,6 +216,8 @@ for(let pair of [
     `if(a) { import 'y' }`,
     [`if(num) { import 'y' }`, `import 'y'`],
     [`if(num === 0) { import 'y' }`, ``],
+    [`if(num === 0) { import 'y' } else { import 'z' }`, `import 'z'`],
+    [`if(true) { a(); b(); }`, `a();b();`],
     
     `return`,
     `return 1`,
@@ -246,6 +248,8 @@ for(let pair of [
     `for(let i = r.length - 1; i >= 0; i -= 1) {}`,
     `for(let i = r.length - 1; i >= 0; i--) {}`,
     [`for(let i = num; i < num; i += num) {}`, `for(let i = 1; i < 1; i += 1) {}`],
+    
+    [`for(;;);`, `for (; ; )\n  ;`],
     
     `let i;`,
     `var i`,

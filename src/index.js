@@ -117,16 +117,8 @@ function walk(node, values, functions, macroes) {
                 i -= 1
             }
             else if(Array.isArray(result.body)) {
-                if(result.body.length === 0) {
-                    node.splice(i, 1)
-                    i -= 1
-                }
-                else if(result.body.length === 1) {
-                    node[i] = result.body[0]
-                }
-                else {
-                    node[i] = result
-                }
+                node.splice(i, 1, ...result.body)
+                i += result.body.length - 1
             }
             else {
                 node[i] = result
@@ -295,9 +287,12 @@ function walk(node, values, functions, macroes) {
         node.elements = walk(node.elements, values, functions, macroes)
     }
     else if(node.type === 'ForStatement') {
-        node.init = walk(node.init, values, functions, macroes)
-        node.test = walk(node.test, values, functions, macroes)
-        node.update = walk(node.update, values, functions, macroes)
+        if(node.init)
+            node.init = walk(node.init, values, functions, macroes)
+        if(node.test)
+            node.test = walk(node.test, values, functions, macroes)
+        if(node.update)
+            node.update = walk(node.update, values, functions, macroes)
         node.body = walk(node.body, values, functions, macroes)
     }
     else {

@@ -1,9 +1,7 @@
 let value
 
-{
-    import b from 'b'
-    
-    value = b
-}
+import b from 'b'
+
+value = b
 
 console.log(value)
