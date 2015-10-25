@@ -5,7 +5,6 @@
   "main": "lib/index.js",
   "jsnext:main": "src/index.js",
   "dependencies": {
-    "ramda": "0.18.0"
   },
   "peerDependencies": {
     "recast": "^0.10.34"
@@ -13,12 +12,13 @@
   "devDependencies": {
     "espower-babel": "3.3.0",
     "mocha": "2.3.3",
-    "power-assert": "1.1.0"
+    "power-assert": "1.1.0",
+    "ramda": "0.18.0"
   },
   "scripts": {
     "test": "mocha --reporter dot --compilers js:espower-babel/guess --ui qunit --recursive test",
     "test-watch": "mocha --growl --watch --reporter min --compilers js:espower-babel/guess --ui qunit --recursive test",
-    "prepublish": "npm run build && npm run examples && npm test",
+    "prepublish": "npm prune && npm run build && npm run examples && npm test",
     "build": "babel src --out-dir lib --source-maps",
     "examples": "node ./examples/build.js"
   },

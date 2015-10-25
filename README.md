@@ -26,12 +26,12 @@ Basic usage:
     
     console.log(result.code) // 2
 
-You can also pass an object as the second parameter and its contents will be used in computations:
+You can also pass values in the options parameter to be used in computations:
 
     var mytacism = require('mytacism')
     
     var source = '1 + a'
-    var result = mytacism(source, {context: {a: 2}})
+    var result = mytacism(source, {values: {a: 2}})
     
     console.log(result.code) // 3
     
@@ -40,6 +40,6 @@ You can also pass functions to be statically executed:
     var mytacism = require('mytacism')
     
     var source = '1 + foo(1)'
-    var result = mytacism(source, {context: {foo: function(a) { return a + 2 }}})
+    var result = mytacism(source, {functions: {foo: function(a) { return a + 2 }}})
     
     console.log(result.code) // 4

@@ -1,6 +1,7 @@
 import assert from 'power-assert'
 import process from '../src'
 import {merge} from 'ramda'
+import {types} from 'recast'
 
 
 suite('mytacism')
@@ -13,13 +14,19 @@ const options = Object.freeze({
         arr: [9, 'a'],
         str: "red",
         shallowHash: {a: 1, b: 2},
+        nestedArr: {x: ['b', null]}
     },
     functions: {
         func: (a) => a + 1,
         func2: (a, b) => a + b,
     },
     macroes: {
-        mac: (a) => `if(${a}) { ${a} += 1 }`
+        mac: (a) => types.builders.ifStatement(
+            a,
+            types.builders.expressionStatement(
+                types.builders.assignmentExpression('+=', a, types.builders.literal(1))
+            )
+        )
     }
 })
 
@@ -168,16 +175,16 @@ for(let pair of [
     
     [`({a: num})`, `({a: 1})`],
     [`({a: {a: num}})`, `({a: {a: 1}})`],
-    `({}.r)`,
-    `({}["2"])`,
-    [`({}[num])`, `({}[1])`],
-    [`({}[num + 1])`, `({}[2])`],
-    `({}.num)`,
-    `({}.obj)`,
+    `(a.r)`,
+    `(a["2"])`,
+    [`(a[num])`, `(a[1])`],
+    [`(a[num + 1])`, `(a[2])`],
+    `(a.num)`,
+    `(a.obj)`,
     
-    `({}).a = 1`,
-    `({})["qwer"] = 1`,
-    [`({})[2 + 2] -= 3`, `({})[4] -= 3`],
+    `k.a = 1`,
+    `k["qwer"] = 1`,
+    [`k[2 + 2] -= 3`, `k[4] -= 3`],
     
     [`obj`, "({\n  \"x\": {\n    \"y\": 39\n  }\n})"],
     
@@ -254,17 +261,12 @@ for(let pair of [
     [`shallowHash["a"]`, `1`],
     [`[4][0]`, `4`],
     [`[4, 3].length`, `2`],
-    // [`shallowHash.c`, ]
+    [`nestedArr.x`, `["b", null]`],
+    [`nestedArr.x[1]`, `null`],
     
-    // [`mac(r)`, `if(r) { r += 1 }`]
+    [`mac(r)`, `if (r)\n  r += 1;;`],
 ]) {
-    let source, expectation
-    if(Array.isArray(pair)) {
-        ;[source, expectation] = pair
-    }
-    else {
-        ;[source, expectation] = [pair, pair]
-    }
+    let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()
     expectation = expectation.trim()
     test(`[   ${source}   ] `, () => assert(result === expectation))
@@ -290,8 +292,9 @@ for(let [source, validator] of [
     [`--num`, /Can't mutate/],
     [`a.1`],
     [`arr.1`],
-    // [`mac(num)`, /Can't mutate/],
-    // [`func(a)`, /Can't evaluate/],
+    [`mac(num)`, /Can't assign to/],
+    [`func(a)`, /Can't evaluate/],
+    [`shallowHash.c`, /has no property/],
 ]) {
     test(`[   ${source}   ] `, () => assert.throws(() => process(source, options), validator))
 }

@@ -1,5 +1,4 @@
 import {parse, print, types} from 'recast'
-import {merge} from 'ramda'
 import binaryExpression from './binary-expression'
 import logicalExpression from './logical-expression'
 
@@ -40,10 +39,13 @@ function valueToNode(value) {
 
 function raiseError(node, message) {
     message = message || 'Unknown error.'
-    message += ` (line ${node.loc.start.line}, column ${node.loc.start.column})`
+    if(node.loc)
+        message += ` (line ${node.loc.start.line}, column ${node.loc.start.column})`
     const error = new Error(message)
-    error.line = node.loc.start.line
-    error.column = node.loc.start.column
+    if(node.loc) {
+        error.line = node.loc.start.line
+        error.column = node.loc.start.column
+    }
     throw error
 }
 
@@ -208,11 +210,21 @@ function walk(node, values, functions, macroes) {
         node.arguments = walk(node.arguments, values, functions, macroes)
         node.callee = walk(node.callee, values, {}, {})
         
-        const args = literalsToValues(node.arguments)
-        const func = contextValue(node.callee, merge(values, functions))
-        
-        if(args !== FAIL && func !== FAIL) {
+        const func = contextValue(node.callee, functions)
+        if(func !== FAIL) {
+            const args = literalsToValues(node.arguments)
+            if(args === FAIL)
+                raiseError(node, `Can't evaluate compile-time function with arguments that don't ` +
+                                 `resolve statically.`)
             return valueToNode(func(...args))
+        }
+        
+        const mac = contextValue(node.callee, macroes)
+        if(mac !== FAIL) {
+            const subNode = mac(...node.arguments)
+            if(!subNode)
+                return undefined
+            return walk(subNode, values, functions, macroes)
         }
     }
     else if(node.type === 'MemberExpression') {
@@ -225,11 +237,13 @@ function walk(node, values, functions, macroes) {
             name = node.property.value
         else if(node.property.type === 'Identifier')
             name = node.property.name
-        
-        if(name !== FAIL) {
-            const obj = literalToValue(node.object)
-            if(obj !== FAIL && Object.prototype.hasOwnProperty.call(obj, name))
+            
+        const obj = literalToValue(node.object)
+        if(name !== FAIL && obj !== FAIL) {
+            if(Object.prototype.hasOwnProperty.call(obj, name))
                 return valueToNode(obj[name])
+            else
+                raiseError(node, `${obj} / ${JSON.stringify(obj)} has no property "${name}"`)
         }
     }
     else if(node.type === 'VariableDeclaration') {
