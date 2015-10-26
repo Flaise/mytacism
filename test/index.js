@@ -1,8 +1,7 @@
 import assert from 'power-assert'
-import process from '../src'
+import {default as process, processAST} from '../src'
 import {merge} from 'ramda'
 import {types} from 'recast'
-
 
 suite('mytacism')
 
@@ -26,9 +25,16 @@ const options = Object.freeze({
             types.builders.expressionStatement(
                 types.builders.assignmentExpression('+=', a, types.builders.literal(1))
             )
-        )
+        ),
+        macAddition: (a, b) => processAST('A + B', {asts: {A: a, B: b}}),
+        macShortcut: '$0 + $1',
+        mac2: 'u(); t()',
+    },
+    asts: {
+        branch: 'if(n) w();'
     }
 })
+
 
 for(let pair of [
     `1`,
@@ -261,6 +267,7 @@ for(let pair of [
     [`arr[0]`, `9`],
     [`arr[1]`, `"a"`],
     [`arr`, `[9, "a"]`],
+    [`arr[a]`, `[9, "a"][a]`],
     [`shallowHash.a`, `1`],
     [`shallowHash["a"]`, `1`],
     [`[4][0]`, `4`],
@@ -268,7 +275,22 @@ for(let pair of [
     [`nestedArr.x`, `["b", null]`],
     [`nestedArr.x[1]`, `null`],
     
+    [`branch`, `if(n) w();;`],
+    
     [`mac(r)`, `if (r)\n  r += 1;;`],
+    [`macAddition(a, b)`, `a + b;`],
+    [`1 + macAddition(a, b)`, `1 + a + b`],
+    [`macAddition(1, b)`, `1 + b;`],
+    [`macAddition(1, 2)`, `3;`],
+    [`macAddition(a(1), b(2))`, `a(1) + b(2);`],
+    [`func(macAddition(1, 2))`, `4`],
+    [`macAddition(func(1), 2)`, `4;`],
+    
+    [`macShortcut(1, 2)`, `3;`],
+    [`macShortcut(a, b)`, `a + b;`],
+    
+    [`mac2()`, `u();t()`],
+    [`if(b) mac2()`, `if(b) {\n  u();t()\n};`],
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()

@@ -4,10 +4,36 @@ import logicalExpression from './logical-expression'
 
 
 export default function process(code, options) {
+    return print(processAST(code, options), options)
+}
+
+export function processAST(code, options) {
     options = options || {}
+    const asts = {}
+    if(options.asts)
+        for(let key of Object.keys(options.asts)) {
+            if(typeof options.asts[key] === 'string')
+                asts[key] = processAST(options.asts[key])
+            else
+                asts[key] = options.asts[key]
+                
+            if(asts[key].type === 'Program') {
+                if(asts[key].body.length === 1)
+                    asts[key] = asts[key].body[0]
+                else if(asts[key].body.length > 1)
+                    asts[key].type = 'BlockStatement'
+            }
+                
+        }
+    
     const ast = parse(code, options)
-    walk(ast, options.values || {}, options.functions || {}, options.macroes || {})
-    return print(ast, options)
+    walk(ast, {
+        values: options.values || {},
+        functions: options.functions || {},
+        macroes: options.macroes || {},
+        asts
+    })
+    return ast.program
 }
 
 const FAIL = {}
@@ -49,22 +75,24 @@ function raiseError(node, message) {
     throw error
 }
 
-function contextValueToNode(node, values, functions, macroes) {
-    if(Object.prototype.hasOwnProperty.call(functions, node.name))
+function contextValueToNode(node, context) {
+    if(Object.prototype.hasOwnProperty.call(context.functions, node.name))
         raiseError(node, 'Compile-time function referenced but not called.')
-    if(Object.prototype.hasOwnProperty.call(macroes, node.name))
+    if(Object.prototype.hasOwnProperty.call(context.macroes, node.name))
         raiseError(node, 'Macro referenced but not called.')
-    if(!Object.prototype.hasOwnProperty.call(values, node.name))
-        return FAIL
-    return valueToNode(values[node.name])
+    if(Object.prototype.hasOwnProperty.call(context.asts, node.name))
+        return context.asts[node.name]
+    if(Object.prototype.hasOwnProperty.call(context.values, node.name))
+        return valueToNode(context.values[node.name])
+    return FAIL
 }
 
-function contextValue(node, context) {
+function contextValue(node, data) {
     if(node.type !== 'Identifier')
         return FAIL
-    if(!Object.prototype.hasOwnProperty.call(context, node.name))
+    if(!Object.prototype.hasOwnProperty.call(data, node.name))
         return FAIL
-    return context[node.name]
+    return data[node.name]
 }
 
 function literalToValue(node) {
@@ -93,6 +121,9 @@ function literalToValue(node) {
         }
         return result
     }
+    else if(node.type === 'ExpressionStatement') {
+        return literalToValue(node.expression)
+    }
     else
         return FAIL
 }
@@ -108,10 +139,10 @@ function literalsToValues(nodes) {
     return result
 }
 
-function walk(node, values, functions, macroes) {
+function walk(node, context) {
     if(Array.isArray(node)) {
         for(let i = 0; i < node.length; i += 1) {
-            const result = walk(node[i], values, functions, macroes)
+            const result = walk(node[i], context)
             if(!result) {
                 node.splice(i, 1)
                 i -= 1
@@ -119,6 +150,10 @@ function walk(node, values, functions, macroes) {
             else if(Array.isArray(result.body)) {
                 node.splice(i, 1, ...result.body)
                 i += result.body.length - 1
+            }
+            else if(result.type === 'ExpressionStatement' && result.expression.type === 'BlockStatement') {
+                node.splice(i, 1, ...result.expression.body)
+                i += result.expression.body.length - 1
             }
             else {
                 node[i] = result
@@ -132,23 +167,23 @@ function walk(node, values, functions, macroes) {
         // pass
     }
     else if(node.type === 'File') {
-        node.program = walk(node.program, values, functions, macroes)
+        node.program = walk(node.program, context)
     }
     else if(node.type === 'Program' || node.type === 'BlockStatement'
             || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration'
             || node.type === 'FunctionExpression') {
-        node.body = walk(node.body, values, functions, macroes)
+        node.body = walk(node.body, context)
     }
     else if(node.type === 'UnaryExpression') {
         if(node.operator === 'delete') {
             if(node.argument.type !== 'Identifier' && node.argument.type !== 'MemberExpression')
                 raiseError(node, `Can't delete ${node.argument.type}.`)
             if(node.argument.type === 'MemberExpression') {
-                node.argument.object = walk(node.argument.object, values, functions, macroes)
-                node.argument.property = walk(node.argument.property, values, functions, macroes)
+                node.argument.object = walk(node.argument.object, context)
+                node.argument.property = walk(node.argument.property, context)
             }
             else {
-                node.argument = walk(node.argument, values, functions, macroes)
+                node.argument = walk(node.argument, context)
             }
             if(node.argument.type === 'Literal' || node.argument.type === 'ObjectExpression'
                     || node.argument.type === 'ArrayExpression')
@@ -162,7 +197,7 @@ function walk(node, values, functions, macroes) {
             }
         }
         else {
-            node.argument = walk(node.argument, values, functions, macroes)
+            node.argument = walk(node.argument, context)
             
             if(node.argument.type === 'Literal') {
                 const operator = unaryOperators[node.operator]
@@ -174,35 +209,38 @@ function walk(node, values, functions, macroes) {
         }
     }
     else if(node.type === 'UpdateExpression') {
-        node.argument = walk(node.argument, values, functions, macroes)
+        node.argument = walk(node.argument, context)
         
         if(node.argument.type === 'Literal')
             raiseError(node, "Can't mutate compile-time constant or literal. Assign a copy to a " +
                              "variable first.")
     }
     else if(node.type === 'BinaryExpression') {
-        node.left = walk(node.left, values, functions, macroes)
-        node.right = walk(node.right, values, functions, macroes)
+        node.left = walk(node.left, context)
+        node.right = walk(node.right, context)
         return binaryExpression(node)
     }
     else if(node.type === 'LogicalExpression') {
-        node.left = walk(node.left, values, functions, macroes)
-        node.right = walk(node.right, values, functions, macroes)
+        node.left = walk(node.left, context)
+        node.right = walk(node.right, context)
         return logicalExpression(node)
     }
     else if(node.type === 'ExpressionStatement') {
-        node.expression = walk(node.expression, values, functions, macroes)
+        node.expression = walk(node.expression, context)
     }
     else if(node.type === 'Identifier') {
-        const result = contextValueToNode(node, values, functions, macroes)
-        if(result !== FAIL)
+        const result = contextValueToNode(node, context)
+        if(result !== FAIL) {
+            if(result.type === 'Program')
+                result.type = 'BlockStatement'
             return result
+        }
     }
     else if(node.type === 'CallExpression' || node.type === 'NewExpression') {
-        node.arguments = walk(node.arguments, values, functions, macroes)
-        node.callee = walk(node.callee, values, {}, {})
+        node.arguments = walk(node.arguments, context)
+        node.callee = walk(node.callee, {values: context.values, functions: {}, macroes: {}, asts: context.asts})
         
-        const func = contextValue(node.callee, functions)
+        const func = contextValue(node.callee, context.functions)
         if(func !== FAIL) {
             const args = literalsToValues(node.arguments)
             if(args === FAIL)
@@ -211,23 +249,38 @@ function walk(node, values, functions, macroes) {
             return valueToNode(func(...args))
         }
         
-        const mac = contextValue(node.callee, macroes)
+        const mac = contextValue(node.callee, context.macroes)
         if(mac !== FAIL) {
-            const subNode = mac(...node.arguments)
-            if(!subNode)
-                return undefined
-            return walk(subNode, values, functions, macroes)
+            if(typeof mac === 'string') {
+                const args = {}
+                for(let i = 0; i < node.arguments.length; i += 1)
+                    args['$' + i] = node.arguments[i]
+                const program = processAST(mac, {asts: args})
+                if(program.body.length > 1) {
+                    program.type = 'BlockStatement'
+                    return program
+                }
+                else {
+                    return program.body[0] // returning undefined for length 0 clips node
+                }
+            }
+            else {
+                const subNode = mac(...node.arguments)
+                if(!subNode)
+                    return undefined
+                return walk(subNode, context)
+            }
         }
     }
     else if(node.type === 'MemberExpression') {
-        node.object = walk(node.object, values, functions, macroes)
+        node.object = walk(node.object, context)
         if(node.computed)
-            node.property = walk(node.property, values, functions, macroes)
+            node.property = walk(node.property, context)
         
         let name = FAIL
-        if(node.property.type === 'Literal')
+        if(node.computed && node.property.type === 'Literal')
             name = node.property.value
-        else if(node.property.type === 'Identifier')
+        else if(!node.computed && node.property.type === 'Identifier')
             name = node.property.name
             
         const obj = literalToValue(node.object)
@@ -239,19 +292,19 @@ function walk(node, values, functions, macroes) {
         }
     }
     else if(node.type === 'VariableDeclaration') {
-        node.declarations = walk(node.declarations, values, functions, macroes)
+        node.declarations = walk(node.declarations, context)
     }
     else if(node.type === 'VariableDeclarator') {
-        node.id = walk(node.id, values, functions, macroes)
+        node.id = walk(node.id, context)
         if(node.init)
-            node.init = walk(node.init, values, functions, macroes)
+            node.init = walk(node.init, context)
     }
     else if(node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
-        node.test = walk(node.test, values, functions, macroes)
+        node.test = walk(node.test, context)
         if(node.consequent.type !== 'EmptyStatement') // keeps original source map
-            node.consequent = walk(node.consequent, values, functions, macroes)
+            node.consequent = walk(node.consequent, context)
         if(node.alternate)
-            node.alternate = walk(node.alternate, values, functions, macroes)
+            node.alternate = walk(node.alternate, context)
             
         if(node.test.type === 'Literal') {
             if(node.test.value)
@@ -261,39 +314,39 @@ function walk(node, values, functions, macroes) {
         }
     }
     else if(node.type === 'ThrowStatement' || node.type === 'YieldExpression') {
-        node.argument = walk(node.argument, values, functions, macroes)
+        node.argument = walk(node.argument, context)
     }
     else if(node.type === 'ReturnStatement') {
         if(node.argument)
-            node.argument = walk(node.argument, values, functions, macroes)
+            node.argument = walk(node.argument, context)
     }
     else if(node.type === 'ObjectExpression') {
-        node.properties = walk(node.properties, values, functions, macroes)
+        node.properties = walk(node.properties, context)
     }
     else if(node.type === 'Property') {
-        node.key = walk(node.key, values, functions, macroes)
-        node.value = walk(node.value, values, functions, macroes)
+        node.key = walk(node.key, context)
+        node.value = walk(node.value, context)
     }
     else if(node.type === 'AssignmentExpression') {
         if(node.left.type !== 'Identifier' && node.left.type !== 'MemberExpression')
             raiseError(node, `Can't assign to ${node.left.type}.`)
-        node.left = walk(node.left, values, functions, macroes)
+        node.left = walk(node.left, context)
         if(node.left.type === 'Literal')
             raiseError(node, "Can't assign to compile-time constant.")
         
-        node.right = walk(node.right, values, functions, macroes)
+        node.right = walk(node.right, context)
     }
     else if(node.type === 'ArrayExpression') {
-        node.elements = walk(node.elements, values, functions, macroes)
+        node.elements = walk(node.elements, context)
     }
     else if(node.type === 'ForStatement') {
         if(node.init)
-            node.init = walk(node.init, values, functions, macroes)
+            node.init = walk(node.init, context)
         if(node.test)
-            node.test = walk(node.test, values, functions, macroes)
+            node.test = walk(node.test, context)
         if(node.update)
-            node.update = walk(node.update, values, functions, macroes)
-        node.body = walk(node.body, values, functions, macroes)
+            node.update = walk(node.update, context)
+        node.body = walk(node.body, context)
     }
     else {
         console.log('unknown type\n', node, '\n')
