@@ -16,7 +16,6 @@ options.macroes.SANITY = (test, kludge) => {
     if(kludge) {
         if(kludge.type === 'Literal' && typeof kludge.value === 'string')
             kludge = processAST(kludge.value)
-        console.log(kludge.type)
         return processAST(`if(!$$test) $$kludge`, {asts: {$$test: test, $$kludge: kludge}})
     }
     else
