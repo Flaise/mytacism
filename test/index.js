@@ -291,6 +291,29 @@ for(let pair of [
     
     [`mac2()`, `u();t()`],
     [`if(b) mac2()`, `if(b) {\n  u();t()\n};`],
+    
+    `export function a() {}`,
+    `export default function a() {}`,
+    `export const a = 2`,
+    [`export const a = 1 + 1`, `export const a = 2`],
+    
+    `this`,
+    `this.a`,
+    `this[1]`,
+    `this['1']`,
+    [`this[1 + 1]`, `this[2]`],
+    
+    `for(let z of b) a()`,
+    [`for(let z of b) a(1 + 1)`, `for(let z of b) a(2)`],
+    
+    `for(;;) { continue; }`,
+    
+    `while(true) {}`,
+    [`while(1 + 1) {}`, `while(2) {}`],
+    [`while(false) { a() }`, ``],
+    `while(a) { a() }`,
+    [`while(a) { a(1 - 1); }`, `while(a) { a(0); }`],
+    `while(a) { continue; }`
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()

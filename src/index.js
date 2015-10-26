@@ -3,9 +3,10 @@ import binaryExpression from './binary-expression'
 import logicalExpression from './logical-expression'
 
 
-export default function process(code, options) {
+export function process(code, options) {
     return print(processAST(code, options), options)
 }
+export default process
 
 export function processAST(code, options) {
     options = options || {}
@@ -23,7 +24,6 @@ export function processAST(code, options) {
                 else if(asts[key].body.length > 1)
                     asts[key].type = 'BlockStatement'
             }
-                
         }
     
     const ast = parse(code, options)
@@ -163,7 +163,8 @@ function walk(node, context) {
     else if(node.type === 'EmptyStatement') {
         return undefined
     }
-    else if(node.type === 'Literal' || node.type === 'ImportDeclaration') {
+    else if(node.type === 'Literal' || node.type === 'ImportDeclaration'
+            || node.type === 'ThisExpression' || node.type === 'ContinueStatement') {
         // pass
     }
     else if(node.type === 'File') {
@@ -347,6 +348,20 @@ function walk(node, context) {
         if(node.update)
             node.update = walk(node.update, context)
         node.body = walk(node.body, context)
+    }
+    else if(node.type === 'ForOfStatement') {
+        node.right = walk(node.right, context)
+        node.body = walk(node.body, context)
+    }
+    else if(node.type === 'WhileStatement') {
+        node.test = walk(node.test, context)
+        if(node.test.type === 'Literal')
+            if(!node.test.value)
+                return undefined
+        node.body = walk(node.body, context)
+    }
+    else if(node.type === 'ExportDeclaration') {
+        node.declaration = walk(node.declaration, context)
     }
     else {
         console.log('unknown type\n', node, '\n')
