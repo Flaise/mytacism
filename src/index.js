@@ -165,7 +165,8 @@ function walk(node, context) {
         return undefined
     }
     else if(node.type === 'Literal' || node.type === 'ImportDeclaration'
-            || node.type === 'ThisExpression' || node.type === 'ContinueStatement') {
+            || node.type === 'ThisExpression' || node.type === 'ContinueStatement'
+            || node.type === 'BreakStatement') {
         // pass
     }
     else if(node.type === 'File') {
@@ -173,7 +174,7 @@ function walk(node, context) {
     }
     else if(node.type === 'Program' || node.type === 'BlockStatement'
             || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration'
-            || node.type === 'FunctionExpression') {
+            || node.type === 'FunctionExpression' || node.type === 'CatchClause') {
         node.body = walk(node.body, context)
     }
     else if(node.type === 'UnaryExpression') {
@@ -382,6 +383,13 @@ function walk(node, context) {
         node.quasis[node.quasis.length - 1].tail = true
         
         return JSON.parse(JSON.stringify(node))
+    }
+    else if(node.type === 'TryStatement') {
+        node.block = walk(node.block, context)
+        node.handlers = walk(node.handlers, context)
+        node.guardedHandlers = walk(node.guardedHandlers, context)
+        if(node.finalizer)
+            node.finalizer = walk(node.finalizer, context)
     }
     else {
         console.log('unknown type\n', JSON.stringify(node,null,2), '\n')

@@ -315,6 +315,7 @@ for(let pair of [
     `while(a) { a() }`,
     [`while(a) { a(1 - 1); }`, `while(a) { a(0); }`],
     `while(a) { continue; }`,
+    `while(a) { break; }`,
     
     `a(...asdf)`,
     
@@ -329,6 +330,11 @@ for(let pair of [
     "`${a} 1`",
     
     [`empty()`, ``],
+    
+    `try {} catch(e) {}`,
+    `try { a(); } catch(err) {}`,
+    [`try { a(num) } catch(err) { a(err, num) }`, `try { a(1) } catch(err) { a(err, 1) }`],
+    [`try {} finally { num }`, `try {} finally { 1 }`],
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()
