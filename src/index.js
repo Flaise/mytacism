@@ -327,7 +327,7 @@ function walk(node, context) {
         if(node.argument)
             node.argument = walk(node.argument, context)
     }
-    else if(node.type === 'ObjectExpression') {
+    else if(node.type === 'ObjectExpression' || node.type === 'ObjectPattern') {
         node.properties = walk(node.properties, context)
     }
     else if(node.type === 'Property') {
@@ -343,7 +343,7 @@ function walk(node, context) {
         
         node.right = walk(node.right, context)
     }
-    else if(node.type === 'ArrayExpression') {
+    else if(node.type === 'ArrayExpression' || node.type === 'ArrayPattern') {
         node.elements = walk(node.elements, context)
     }
     else if(node.type === 'ForStatement') {
@@ -355,7 +355,7 @@ function walk(node, context) {
             node.update = walk(node.update, context)
         node.body = walk(node.body, context)
     }
-    else if(node.type === 'ForOfStatement') {
+    else if(node.type === 'ForOfStatement' || node.type === 'ForInStatement') {
         node.right = walk(node.right, context)
         node.body = walk(node.body, context)
     }

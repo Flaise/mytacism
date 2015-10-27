@@ -307,6 +307,9 @@ for(let pair of [
     `for(let z of b) a()`,
     [`for(let z of b) a(1 + 1)`, `for(let z of b) a(2)`],
     
+    `for(let z in b) a()`,
+    [`for(let z in b) a(1 + 1)`, `for(let z in b) a(2)`],
+    
     `for(;;) { continue; }`,
     
     `while(true) {}`,
@@ -335,6 +338,12 @@ for(let pair of [
     `try { a(); } catch(err) {}`,
     [`try { a(num) } catch(err) { a(err, num) }`, `try { a(1) } catch(err) { a(err, 1) }`],
     [`try {} finally { num }`, `try {} finally { 1 }`],
+    
+    `let {a, b} = n()`,
+    `const {a, b} = n()`,
+    `var {a: d, b: z} = p()`,
+    `let [a, b] = n()`,
+    `const [a, b] = n()`,
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()
