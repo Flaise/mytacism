@@ -29,6 +29,7 @@ const options = Object.freeze({
         macAddition: (a, b) => processAST('A + B', {asts: {A: a, B: b}}),
         macShortcut: '$0 + $1',
         mac2: 'u(); t()',
+        empty: () => undefined
     },
     asts: {
         branch: 'if(n) w();'
@@ -326,6 +327,8 @@ for(let pair of [
     ['`${num}${"a"}`', '`1a`'],
     ['`${a} ${1}`', '`${a} 1`'],
     "`${a} 1`",
+    
+    [`empty()`, ``],
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()

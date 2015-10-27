@@ -151,7 +151,8 @@ function walk(node, context) {
                 node.splice(i, 1, ...result.body)
                 i += result.body.length - 1
             }
-            else if(result.type === 'ExpressionStatement' && result.expression.type === 'BlockStatement') {
+            else if(result.type === 'ExpressionStatement'
+                    && result.expression.type === 'BlockStatement') {
                 node.splice(i, 1, ...result.expression.body)
                 i += result.expression.body.length - 1
             }
@@ -228,6 +229,8 @@ function walk(node, context) {
     }
     else if(node.type === 'ExpressionStatement') {
         node.expression = walk(node.expression, context)
+        if(!node.expression)
+            return undefined
     }
     else if(node.type === 'Identifier') {
         const result = contextValueToNode(node, context)
@@ -239,7 +242,8 @@ function walk(node, context) {
     }
     else if(node.type === 'CallExpression' || node.type === 'NewExpression') {
         node.arguments = walk(node.arguments, context)
-        node.callee = walk(node.callee, {values: context.values, functions: {}, macroes: {}, asts: context.asts})
+        node.callee = walk(node.callee, {values: context.values, functions: {}, macroes: {},
+                                         asts: context.asts})
         
         const func = contextValue(node.callee, context.functions)
         if(func !== FAIL) {

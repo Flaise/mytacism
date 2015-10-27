@@ -14,12 +14,12 @@ const options = {
 
 options.macroes.SANITY = (test, kludge) => {
     if(kludge) {
-        if(kludge.type === 'Literal' && typeof kludge.value === 'string')
-            kludge = processAST(kludge.value)
+        if(kludge.type === 'ArrowFunctionExpression' || kludge.type === 'FunctionDeclaration')
+            return processAST(`if(!$$test) $$kludge`, {asts: {$$test: test, $$kludge: kludge.body}})
         return processAST(`if(!$$test) $$kludge`, {asts: {$$test: test, $$kludge: kludge}})
     }
     else
-        return processAST(';')
+        return undefined
 }
 const outProduction = process(inSource, options)
 
