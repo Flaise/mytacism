@@ -314,7 +314,8 @@ function walk(node, context) {
                 return node.alternate
         }
     }
-    else if(node.type === 'ThrowStatement' || node.type === 'YieldExpression') {
+    else if(node.type === 'ThrowStatement' || node.type === 'YieldExpression'
+            || node.type === 'SpreadElement') {
         node.argument = walk(node.argument, context)
     }
     else if(node.type === 'ReturnStatement') {
@@ -355,16 +356,31 @@ function walk(node, context) {
     }
     else if(node.type === 'WhileStatement') {
         node.test = walk(node.test, context)
-        if(node.test.type === 'Literal')
-            if(!node.test.value)
-                return undefined
+        if(node.test.type === 'Literal' && !node.test.value)
+            return undefined
         node.body = walk(node.body, context)
     }
     else if(node.type === 'ExportDeclaration') {
         node.declaration = walk(node.declaration, context)
     }
+    else if(node.type === 'TemplateLiteral') {
+        node.expressions = walk(node.expressions, context)
+        
+        for(let i = 0; i < node.expressions.length; i += 1) {
+            if(node.expressions[i].type === 'Literal') {
+                node.quasis[i].value.raw += node.expressions[i].value + node.quasis[i + 1].value.raw
+                node.quasis[i].value.cooked += node.expressions[i].value + node.quasis[i + 1].value.cooked
+                node.quasis.splice(i + 1, 1)
+                node.expressions.splice(i, 1)
+                i -= 1
+            }
+        }
+        node.quasis[node.quasis.length - 1].tail = true
+        
+        return JSON.parse(JSON.stringify(node))
+    }
     else {
-        console.log('unknown type\n', node, '\n')
+        console.log('unknown type\n', JSON.stringify(node,null,2), '\n')
     }
     return node
 }

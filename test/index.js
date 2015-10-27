@@ -313,7 +313,19 @@ for(let pair of [
     [`while(false) { a() }`, ``],
     `while(a) { a() }`,
     [`while(a) { a(1 - 1); }`, `while(a) { a(0); }`],
-    `while(a) { continue; }`
+    `while(a) { continue; }`,
+    
+    `a(...asdf)`,
+    
+    '``',
+    '`asdf`',
+    '`${a}`',
+    ['`${-3}`', '`-3`'],
+    ['`${num}`', '`1`'],
+    ['`a - ${num} + 3`', '`a - 1 + 3`'],
+    ['`${num}${"a"}`', '`1a`'],
+    ['`${a} ${1}`', '`${a} 1`'],
+    "`${a} 1`",
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()
