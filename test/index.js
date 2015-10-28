@@ -29,7 +29,8 @@ const options = Object.freeze({
         macAddition: (a, b) => processAST('A + B', {asts: {A: a, B: b}}),
         macShortcut: '$0 + $1',
         mac2: 'u(); t()',
-        empty: () => undefined
+        empty: () => undefined,
+        functionBody: (a) => a.body,
     },
     asts: {
         branch: 'if(n) w();'
@@ -279,19 +280,19 @@ for(let pair of [
     [`branch`, `if(n) w();;`],
     
     [`mac(r)`, `if (r)\n  r += 1;;`],
-    [`macAddition(a, b)`, `a + b;`],
+    [`macAddition(a, b)`, `a + b`],
     [`1 + macAddition(a, b)`, `1 + a + b`],
-    [`macAddition(1, b)`, `1 + b;`],
-    [`macAddition(1, 2)`, `3;`],
-    [`macAddition(a(1), b(2))`, `a(1) + b(2);`],
+    [`macAddition(1, b)`, `1 + b`],
+    [`macAddition(1, 2)`, `3`],
+    [`macAddition(a(1), b(2))`, `a(1) + b(2)`],
     [`func(macAddition(1, 2))`, `4`],
-    [`macAddition(func(1), 2)`, `4;`],
+    [`macAddition(func(1), 2)`, `4`],
     
     [`macShortcut(1, 2)`, `3;`],
     [`macShortcut(a, b)`, `a + b;`],
     
     [`mac2()`, `u();t()`],
-    [`if(b) mac2()`, `if(b) {\n  u();t()\n};`],
+    [`if(b) mac2()`, `if (b) {\n  u();t()\n}`],
     
     `export function a() {}`,
     `export default function a() {}`,
@@ -344,6 +345,18 @@ for(let pair of [
     `var {a: d, b: z} = p()`,
     `let [a, b] = n()`,
     `const [a, b] = n()`,
+    
+    `switch(b) {}`,
+    `switch(b) { case a: break; }`,
+    [`switch(b) { case num: break; }`, `switch(b) { case 1: break; }`],
+    [`switch(b + num) { case r: return 3; case "asdf": return num + 1 }`, `switch(b + 1) { case r: return 3; case "asdf": return 2 }`],
+    [`switch(num) { case 1: throw new Error(); }`, `throw new Error();`],
+    [`switch(1) { case 1: a(); case 2: b(); break; }`, `a();b();`],
+    [`switch(1) { case 1: for(;;) break; case 2: b(); break; }`, `for(;;) break;b();`],
+    
+    [`functionBody(() => 1)`, `1`],
+    [`functionBody(function() { return 1 })`, `return 1`],
+    [`functionBody(() => {if(a) b()})\nfunctionBody(() => {if(b) a()})`, `if(a) b()\nif(b) a()`]
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     const result = process(source, options).code.trim()

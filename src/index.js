@@ -151,11 +151,6 @@ function walk(node, context) {
                 node.splice(i, 1, ...result.body)
                 i += result.body.length - 1
             }
-            else if(result.type === 'ExpressionStatement'
-                    && result.expression.type === 'BlockStatement') {
-                node.splice(i, 1, ...result.expression.body)
-                i += result.expression.body.length - 1
-            }
             else {
                 node[i] = result
             }
@@ -176,6 +171,8 @@ function walk(node, context) {
             || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration'
             || node.type === 'FunctionExpression' || node.type === 'CatchClause') {
         node.body = walk(node.body, context)
+        if(!node.body)
+            return undefined
     }
     else if(node.type === 'UnaryExpression') {
         if(node.operator === 'delete') {
@@ -230,8 +227,10 @@ function walk(node, context) {
     }
     else if(node.type === 'ExpressionStatement') {
         node.expression = walk(node.expression, context)
-        if(!node.expression)
+        if(!node.expression || node.expression.type === 'EmptyStatement')
             return undefined
+        if(node.expression.type === 'BlockStatement' || node.expression.type === 'Program')
+            return node.expression
     }
     else if(node.type === 'Identifier') {
         const result = contextValueToNode(node, context)
@@ -318,6 +317,10 @@ function walk(node, context) {
             else
                 return node.alternate
         }
+        
+        // TODO: a hopefully temporary workaround for https://github.com/benjamn/recast/issues/222
+        if(!node.alternate && node.consequent.type === 'ExpressionStatement')
+            delete node.loc
     }
     else if(node.type === 'ThrowStatement' || node.type === 'YieldExpression'
             || node.type === 'SpreadElement') {
@@ -390,6 +393,33 @@ function walk(node, context) {
         node.guardedHandlers = walk(node.guardedHandlers, context)
         if(node.finalizer)
             node.finalizer = walk(node.finalizer, context)
+    }
+    else if(node.type === 'SwitchStatement') {
+        node.discriminant = walk(node.discriminant, context)
+        node.cases = walk(node.cases, context)
+        
+        if(node.discriminant.type === 'Literal') {
+            let statements = undefined
+            for(let element of node.cases) {
+                if(!statements && element.test.type !== 'Literal'
+                        && element.test.value !== node.discriminant.value)
+                    continue;
+                if(!statements)
+                    statements = []
+                
+                for(let subElement of element.consequent) {
+                    if(subElement.type === 'BreakStatement')
+                        return types.builders.blockStatement(statements)
+                    statements.push(subElement)
+                }
+                
+            }
+            return types.builders.blockStatement(statements)
+        }
+    }
+    else if(node.type === 'SwitchCase') {
+        node.test = walk(node.test, context)
+        node.consequent = walk(node.consequent, context)
     }
     else {
         console.log('unknown type\n', JSON.stringify(node,null,2), '\n')
