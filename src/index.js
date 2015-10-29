@@ -58,6 +58,9 @@ function valueToNode(value) {
         }
         return types.builders.objectExpression(nodes)
     }
+    else if(typeof value === 'function') {
+        return FAIL
+    }
     else {
         return types.builders.literal(value)
     }
@@ -242,38 +245,59 @@ function walk(node, context) {
     }
     else if(node.type === 'CallExpression' || node.type === 'NewExpression') {
         node.arguments = walk(node.arguments, context)
-        node.callee = walk(node.callee, {values: context.values, functions: {}, macroes: {},
-                                         asts: context.asts})
         
-        const func = contextValue(node.callee, context.functions)
-        if(func !== FAIL) {
+        if(node.callee.type === 'MemberExpression') {
+            node.callee.object = walk(node.callee.object, context)
+            if(node.callee.computed)
+                node.callee.property = walk(node.callee.property, context)
+                
+            let name = FAIL
+            if(node.callee.computed && node.callee.property.type === 'Literal')
+                name = node.callee.property.value
+            else if(!node.callee.computed && node.callee.property.type === 'Identifier')
+                name = node.callee.property.name
+                
+            const obj = literalToValue(node.callee.object)
             const args = literalsToValues(node.arguments)
-            if(args === FAIL)
-                raiseError(node, `Can't evaluate compile-time function with arguments that don't ` +
-                                 `resolve statically.`)
-            return valueToNode(func(...args))
+            if(name !== FAIL && obj !== FAIL && args !== FAIL) {
+                if(typeof obj[name] === 'function')
+                    return valueToNode(obj[name](...args))
+            }
         }
-        
-        const mac = contextValue(node.callee, context.macroes)
-        if(mac !== FAIL) {
-            if(typeof mac === 'string') {
-                const args = {}
-                for(let i = 0; i < node.arguments.length; i += 1)
-                    args['$' + i] = node.arguments[i]
-                const program = processAST(mac, {asts: args})
-                if(program.body.length > 1) {
-                    program.type = 'BlockStatement'
-                    return program
+        else {
+            node.callee = walk(node.callee, {values: context.values, functions: {}, macroes: {},
+                                             asts: context.asts})
+            
+            const func = contextValue(node.callee, context.functions)
+            if(func !== FAIL) {
+                const args = literalsToValues(node.arguments)
+                if(args === FAIL)
+                    raiseError(node, `Can't evaluate compile-time function with arguments that don't ` +
+                                     `resolve statically.`)
+                return valueToNode(func(...args))
+            }
+            
+            const mac = contextValue(node.callee, context.macroes)
+            if(mac !== FAIL) {
+                if(typeof mac === 'string') {
+                    const args = {}
+                    for(let i = 0; i < node.arguments.length; i += 1)
+                        args['$' + i] = node.arguments[i]
+                    const program = processAST(mac, {asts: args})
+                    if(program.body.length > 1) {
+                        program.type = 'BlockStatement'
+                        return program
+                    }
+                    else {
+                        return program.body[0] // returning undefined for length 0 clips node
+                    }
                 }
                 else {
-                    return program.body[0] // returning undefined for length 0 clips node
+                    const subNode = mac(...node.arguments)
+                    if(!subNode)
+                        return undefined
+                    return walk(subNode, context)
                 }
-            }
-            else {
-                const subNode = mac(...node.arguments)
-                if(!subNode)
-                    return undefined
-                return walk(subNode, context)
             }
         }
     }
@@ -287,11 +311,14 @@ function walk(node, context) {
             name = node.property.value
         else if(!node.computed && node.property.type === 'Identifier')
             name = node.property.name
-            
+        
         const obj = literalToValue(node.object)
         if(name !== FAIL && obj !== FAIL) {
-            if(Object.prototype.hasOwnProperty.call(obj, name))
-                return valueToNode(obj[name])
+            if(name in obj) {
+                const result = valueToNode(obj[name])
+                if(result !== FAIL)
+                    return result
+            }
             else
                 raiseError(node, `${obj} / ${JSON.stringify(obj)} has no property "${name}"`)
         }

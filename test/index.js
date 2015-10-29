@@ -356,12 +356,21 @@ for(let pair of [
     
     [`functionBody(() => 1)`, `1`],
     [`functionBody(function() { return 1 })`, `return 1`],
-    [`functionBody(() => {if(a) b()})\nfunctionBody(() => {if(b) a()})`, `if(a) b()\nif(b) a()`]
+    [`functionBody(() => {if(a) b()})\nfunctionBody(() => {if(b) a()})`, `if(a) b()\nif(b) a()`],
+    
+    [`[1].concat([2])`, `[1, 2]`],
+    `[1].concat`,
+    [`'a' + 'b'`, `"ab"`],
+    
+    [`arr.concat`, `[9, "a"].concat`],
+    [`arr.concat([1])`, `[9, "a", 1]`],
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
-    const result = process(source, options).code.trim()
     expectation = expectation.trim()
-    test(`[   ${source}   ] `, () => assert(result === expectation))
+    test(`[   ${source}   ] `, () => {
+        const result = process(source, options).code.trim()
+        assert(result === expectation)
+    })
 }
 
 for(let [source, validator] of [
