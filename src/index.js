@@ -1,6 +1,7 @@
 import {parse, print, types} from 'recast'
 import binaryExpression from './binary-expression'
 import logicalExpression from './logical-expression'
+import unaryExpression from './unary-expression'
 
 
 export function process(code, options) {
@@ -36,18 +37,14 @@ export function processAST(code, options) {
     return ast.program
 }
 
-const FAIL = {}
+export const FAIL = {}
 
-const unaryOperators = {
-    '+': (a => +a),
-    '-': (a => -a),
-    '~': (a => ~a),
-    '!': (a => !a),
-}
-
-function valueToNode(value) {
+export function valueToNode(value) {
     if(Array.isArray(value)) {
         return types.builders.arrayExpression(value.map(a => valueToNode(a)))
+    }
+    else if(value === void 0) {
+        return types.builders.unaryExpression('void', types.builders.literal(0))
     }
     else if(value && typeof value === 'object') {
         const nodes = []
@@ -66,7 +63,7 @@ function valueToNode(value) {
     }
 }
 
-function raiseError(node, message) {
+export function raiseError(node, message) {
     message = message || 'Unknown error.'
     if(node.loc)
         message += ` (line ${node.loc.start.line}, column ${node.loc.start.column})`
@@ -98,7 +95,7 @@ function contextValue(node, data) {
     return data[node.name]
 }
 
-function literalToValue(node) {
+export function literalToValue(node) {
     if(node.type === 'Literal')
         return node.value
     else if(node.type === 'ObjectExpression') {
@@ -142,7 +139,7 @@ function literalsToValues(nodes) {
     return result
 }
 
-function walk(node, context) {
+export function walk(node, context) {
     if(Array.isArray(node)) {
         for(let i = 0; i < node.length; i += 1) {
             const result = walk(node[i], context)
@@ -172,49 +169,24 @@ function walk(node, context) {
     }
     else if(node.type === 'Program' || node.type === 'BlockStatement'
             || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration'
-            || node.type === 'FunctionExpression' || node.type === 'CatchClause') {
+            || node.type === 'FunctionExpression' || node.type === 'CatchClause'
+            || node.type === 'ClassDeclaration' || node.type === 'ClassBody') {
         node.body = walk(node.body, context)
         if(!node.body)
             return undefined
     }
+    else if(node.type === 'SequenceExpression') {
+        node.expressions = walk(node.expressions, context)
+        if(!node.expressions)
+            return undefined
+    }
     else if(node.type === 'UnaryExpression') {
-        if(node.operator === 'delete') {
-            if(node.argument.type !== 'Identifier' && node.argument.type !== 'MemberExpression')
-                raiseError(node, `Can't delete ${node.argument.type}.`)
-            if(node.argument.type === 'MemberExpression') {
-                node.argument.object = walk(node.argument.object, context)
-                node.argument.property = walk(node.argument.property, context)
-            }
-            else {
-                node.argument = walk(node.argument, context)
-            }
-            if(node.argument.type === 'Literal' || node.argument.type === 'ObjectExpression'
-                    || node.argument.type === 'ArrayExpression')
-                raiseError(node, "Can't delete compile-time constant.")
-            if(node.argument.type === 'MemberExpression') {
-                const obj = node.argument.object
-                if(obj.type === 'Literal' || obj.type === 'ObjectExpression'
-                        || obj.type === 'ArrayExpression')
-                    raiseError(node, "Can't mutate compile-time constant or literal. Assign a " +
-                                     "copy to a variable first.")
-            }
-        }
-        else {
-            node.argument = walk(node.argument, context)
-            
-            if(node.argument.type === 'Literal') {
-                const operator = unaryOperators[node.operator]
-                if(operator)
-                    return types.builders.literal(operator(node.argument.value))
-                else
-                    console.warn(`Unknown unary operator`, node)
-            }
-        }
+        return unaryExpression(node, context)
     }
     else if(node.type === 'UpdateExpression') {
         node.argument = walk(node.argument, context)
         
-        if(node.argument.type === 'Literal')
+        if(literalToValue(node.argument) !== FAIL)
             raiseError(node, "Can't mutate compile-time constant or literal. Assign a copy to a " +
                              "variable first.")
     }
@@ -314,7 +286,7 @@ function walk(node, context) {
         
         const obj = literalToValue(node.object)
         if(name !== FAIL && obj !== FAIL) {
-            if(name in obj) {
+            if(obj && typeof obj === 'object' && name in obj) {
                 const result = valueToNode(obj[name])
                 if(result !== FAIL)
                     return result
@@ -364,6 +336,10 @@ function walk(node, context) {
         node.key = walk(node.key, context)
         node.value = walk(node.value, context)
     }
+    else if(node.type === 'MethodDefinition') {
+        node.key = walk(node.key, context)
+        node.value = walk(node.value, context)
+    }
     else if(node.type === 'AssignmentExpression') {
         if(node.left.type !== 'Identifier' && node.left.type !== 'MemberExpression')
             raiseError(node, `Can't assign to ${node.left.type}.`)
@@ -393,6 +369,10 @@ function walk(node, context) {
         node.test = walk(node.test, context)
         if(node.test.type === 'Literal' && !node.test.value)
             return undefined
+        node.body = walk(node.body, context)
+    }
+    else if(node.type === 'DoWhileStatement') {
+        node.test = walk(node.test, context)
         node.body = walk(node.body, context)
     }
     else if(node.type === 'ExportDeclaration') {
@@ -428,7 +408,7 @@ function walk(node, context) {
         if(node.discriminant.type === 'Literal') {
             let statements = undefined
             for(let element of node.cases) {
-                if(!statements && element.test.type !== 'Literal'
+                if(!statements && element.test != null && element.test.type !== 'Literal'
                         && element.test.value !== node.discriminant.value)
                     continue;
                 if(!statements)
@@ -445,7 +425,8 @@ function walk(node, context) {
         }
     }
     else if(node.type === 'SwitchCase') {
-        node.test = walk(node.test, context)
+        if(node.test)
+            node.test = walk(node.test, context)
         node.consequent = walk(node.consequent, context)
     }
     else {

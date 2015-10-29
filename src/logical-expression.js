@@ -7,8 +7,8 @@ export default function(node) {
 const FAIL = {}
 
 const operators = {
-    '||': shortcutBinaryOperator((a => a? a: FAIL), (a => a? a: FAIL), ((a, b) => a || b)),
-    '&&': shortcutBinaryOperator((a => a? FAIL: a), (a => a), ((a, b) => a && b)),
+    '||': or,
+    '&&': and,
 }
 
 function shortcutBinaryOperator(funcLeft, funcRight, func2) {
@@ -31,10 +31,35 @@ function shortcutBinaryOperator(funcLeft, funcRight, func2) {
             }
             return types.builders.literal(result)
         }
-        else if(leftValue === FAIL) {
-            return node.right
-        }
         
         return node
     }
+}
+
+function or(node) {
+    if(node.left.type === 'Literal') {
+        if(node.right.type === 'Literal')
+            return types.builders.literal(node.left.value || node.right.value)
+        if(node.left.value)
+            return types.builders.literal(node.left.value)
+        return node.right
+    }
+    
+    return node
+}
+
+function and(node) {
+    if(node.left.type === 'Literal') {
+        if(node.right.type === 'Literal')
+            return types.builders.literal(node.left.value && node.right.value)
+        if(!node.left.value)
+            return node.right
+        return types.builders.literal(node.left.value)
+    }
+    else {
+        if(node.right.type === 'Literal')
+            return types.builders.literal(node.right.value)
+    }
+
+    return node
 }

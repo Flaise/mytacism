@@ -13,11 +13,12 @@ const options = Object.freeze({
         arr: [9, 'a'],
         str: "red",
         shallowHash: {a: 1, b: 2},
-        nestedArr: {x: ['b', null]}
+        nestedArr: {x: ['b', null]},
     },
     functions: {
         func: (a) => a + 1,
         func2: (a, b) => a + b,
+        returnsUndefined: () => undefined,
     },
     macroes: {
         mac: (a) => types.builders.ifStatement(
@@ -97,9 +98,14 @@ for(let pair of [
     `if(a) {}`,
     
     [`if(num === 1) a`, `a`],
-    [`if(num !== 2 && a) { throw new Error() }`, `if(a) { throw new Error() }`],
+    [`if(num !== 2 && a) { throw new Error() }`, `throw new Error()`],
     [`if(num == 1) { a }`, `a`],
     [`if(num != 1 || a) { throw new Error() }`, `if(a) { throw new Error() }`],
+    
+    `(b || [])[1]`,
+    
+    [`true && b`, `true`],
+    [`false && b`, `b`],
     
     `if(a === 1) {}`,
     `if(a !== 1) { throw new Error() }`,
@@ -111,6 +117,7 @@ for(let pair of [
     [`num > 10`, `false`],
     [`num < 2`, `true`],
     [`num + num >= 2`, `true`],
+    [`2 <= num + num`, `true`],
     
     // NOTE: This might be a bug in recast@0.10.34 - it's supposed to preserve formatting
     ['if(a);else;', "if (a)\n  ;"],
@@ -262,6 +269,7 @@ for(let pair of [
     `let i;`,
     `var i`,
     `const i = 1`,
+    `let i, j, b`,
     
     [`func('')`, `"1"`],
     [`func({})`, `"${String({} + 1)}"`],
@@ -312,6 +320,7 @@ for(let pair of [
     [`for(let z in b) a(1 + 1)`, `for(let z in b) a(2)`],
     
     `for(;;) { continue; }`,
+    `for(let z = 1, b = 2;;) {}`,
     
     `while(true) {}`,
     [`while(1 + 1) {}`, `while(2) {}`],
@@ -320,6 +329,9 @@ for(let pair of [
     [`while(a) { a(1 - 1); }`, `while(a) { a(0); }`],
     `while(a) { continue; }`,
     `while(a) { break; }`,
+    
+    `do { } while(b);`,
+    [`do {num} while(num);`, `do {1} while(1);`],
     
     `a(...asdf)`,
     
@@ -353,6 +365,10 @@ for(let pair of [
     [`switch(num) { case 1: throw new Error(); }`, `throw new Error();`],
     [`switch(1) { case 1: a(); case 2: b(); break; }`, `a();b();`],
     [`switch(1) { case 1: for(;;) break; case 2: b(); break; }`, `for(;;) break;b();`],
+    `switch(b.c()) { case 0: break; }`,
+    `switch(b.c(2)) { case 0: break; }`,
+    `switch(r) { default: break; }`,
+    [`switch(true) { case true: a(); default: b(); }`, `a();b();`],
     
     [`functionBody(() => 1)`, `1`],
     [`functionBody(function() { return 1 })`, `return 1`],
@@ -364,6 +380,39 @@ for(let pair of [
     
     [`arr.concat`, `[9, "a"].concat`],
     [`arr.concat([1])`, `[9, "a", 1]`],
+    
+    `void a()`,
+    [`void a`, `void 0`],
+    [`void (1 + 1)`, `void (0)`],
+    [`void num`, `void 0`],
+    
+    `typeof a`,
+    [`typeof "a"`, `"string"`],
+    [`typeof 1`, `"number"`],
+    [`typeof {}`, `"object"`],
+    [`typeof null`, `"object"`],
+    [`typeof []`, `"object"`],
+    [`typeof true`, `"boolean"`],
+    `typeof void a()`,
+    
+    [`returnsUndefined()`, `void 0`],
+    [`typeof returnsUndefined()`, `"undefined"`],
+    
+    `a in b`,
+    [`a in num`, `a in 1`],
+    [`'asdf' in obj`, `false`],
+    [`0 in arr`, `true`],
+    
+    `a instanceof b`,
+    `a instanceof Object`,
+    
+    `class K {\nconstructor(r) {}\nasdf(r, n) {}\n}`,
+    [`class K {\nconstructor(r) {}\nasdf(r, n) {return num}\n}`, `class K {\nconstructor(r) {}\nasdf(r, n) {return 1}\n}`],
+    [`class K {[num]() { throw e }}`, `class K {[1]() { throw e }}`],
+    
+    `1,2`,
+    `a(),b()`,
+    [`a(num), b()`, `a(1), b()`],
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     expectation = expectation.trim()
@@ -396,6 +445,7 @@ for(let [source, validator] of [
     [`mac(num)`, /Can't assign to/],
     [`func(a)`, /Can't evaluate/],
     [`shallowHash.c`, /has no property/],
+    [`null.c`, /has no property/],
 ]) {
     test(`[   ${source}   ] `, () => assert.throws(() => process(source, options), validator))
 }
