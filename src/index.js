@@ -26,13 +26,14 @@ export function processAST(code, options) {
                     asts[key].type = 'BlockStatement'
             }
         }
-    
+
     const ast = parse(code, options)
     walk(ast, {
         values: options.values || {},
         functions: options.functions || {},
         macroes: options.macroes || {},
-        asts
+        asts,
+        functionHierarchy: []
     })
     return ast.program
 }
@@ -77,9 +78,9 @@ export function raiseError(node, message) {
 
 function contextValueToNode(node, context) {
     if(Object.prototype.hasOwnProperty.call(context.functions, node.name))
-        raiseError(node, 'Compile-time function referenced but not called.')
+        raiseError(node, `Compile-time function "${node.name}" referenced but not called.`)
     if(Object.prototype.hasOwnProperty.call(context.macroes, node.name))
-        raiseError(node, 'Macro referenced but not called.')
+        raiseError(node, `Macro "${node.name}" referenced but not called.`)
     if(Object.prototype.hasOwnProperty.call(context.asts, node.name))
         return context.asts[node.name]
     if(Object.prototype.hasOwnProperty.call(context.values, node.name))
@@ -144,27 +145,106 @@ function isTerminal(node) {
     return terminalTypes.indexOf(node.type) >= 0
 }
 
-export function walk(node, context) {
-    if(Array.isArray(node)) {
-        for(let i = 0; i < node.length; i += 1) {
-            const result = walk(node[i], context)
-            if(!result) {
-                node.splice(i, 1)
-                i -= 1
-            }
-            else if(Array.isArray(result.body)) {
-                node.splice(i, 1, ...result.body)
-                i += result.body.length - 1
-            }
-            else {
-                node[i] = result
+function processArray(node, context) {
+    for(let i = 0; i < node.length; i += 1) {
+        const result = walk(node[i], context)
+        if(!result) {
+            node.splice(i, 1)
+            i -= 1
+        }
+        else if(Array.isArray(result.body)) {
+            node.splice(i, 1, ...result.body)
+            i += result.body.length - 1
+        }
+        else {
+            node[i] = result
 
-                if(isTerminal(result)) {
-                    node.splice(i + 1)
-                    break
-                }
+            if(isTerminal(result)) {
+                node.splice(i + 1)
+                break
             }
         }
+    }
+
+    if(context.noInline)
+        return
+
+    const funcs = {};
+    for(let i = 0; i < node.length; i += 1) {
+        let item
+        if(node[i].type === 'FunctionDeclaration') {
+            item = node[i]
+        }
+        else if(node[i].type === 'ExportDeclaration'
+                && node[i].declaration.type === 'FunctionDeclaration') {
+            item = node[i].declaration
+        }
+        else {
+            continue
+        }
+
+        if(item.body.body.length > 1)
+            continue
+
+        if(anyRepeatAccess(item.params))
+            continue
+
+        funcs[item.id.name] = func2macro(walk(
+            item,
+            Object.assign({}, context, {macroes: Object.assign({}, context.macroes, funcs)})
+        ))
+    }
+
+    if(Object.keys(funcs).length) {
+        processArray(
+            node,
+            Object.assign({},
+                          context,
+                          {macroes: Object.assign({}, context.macroes, funcs),
+                           noInline: true})
+        )
+    }
+}
+
+function func2macro(node) {
+    if(!node.body.body.length || node.body.body[0].type !== 'ReturnStatement')
+        return () => {}
+
+    const body = JSON.parse(JSON.stringify(node.body.body[0].argument))
+    return function(...args) {
+        const asts = {}
+        for(let i = 0; i < args.length; i += 1) {
+            asts[node.params[i].name] = args[i]
+        }
+        return walk(body,
+                    {values: {}, functions: {}, macroes: {}, asts, functionHierarchy: []})
+    }
+}
+
+function anyRepeatAccess(params) {
+    for(let param of params) {
+        if(param.accessCount > 1)
+            return true
+    }
+    return false
+}
+
+function incrementAccessCount(name, context) {
+    for(let i = context.functionHierarchy.length - 1; i >= 0; i -= 1) {
+        const func = context.functionHierarchy[i];
+
+        for(let param of func.params) {
+            if(param.name === name) {
+                param.accessCount = (param.accessCount || 0) + 1
+                return
+            }
+        }
+    }
+}
+
+export function walk(node, context) {
+    if(Array.isArray(node)) {
+        processArray(node, context);
     }
     else if(node.type === 'EmptyStatement') {
         return undefined
@@ -177,8 +257,15 @@ export function walk(node, context) {
     else if(node.type === 'File') {
         node.program = walk(node.program, context)
     }
+    else if(node.type === 'FunctionDeclaration') {
+        context.functionHierarchy.push(node)
+        node.body = walk(node.body, context)
+        context.functionHierarchy.pop()
+        if(!node.body)
+            return undefined
+    }
     else if(node.type === 'Program' || node.type === 'BlockStatement'
-            || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration'
+            || node.type === 'ArrowFunctionExpression'
             || node.type === 'FunctionExpression' || node.type === 'CatchClause'
             || node.type === 'ClassDeclaration' || node.type === 'ClassBody') {
         node.body = walk(node.body, context)
@@ -219,7 +306,10 @@ export function walk(node, context) {
     }
     else if(node.type === 'Identifier') {
         const result = contextValueToNode(node, context)
-        if(result !== FAIL) {
+        if(result === FAIL) {
+            incrementAccessCount(node.name, context)
+        }
+        else {
             if(result.type === 'Program')
                 result.type = 'BlockStatement'
             return result
@@ -248,7 +338,8 @@ export function walk(node, context) {
         }
         else {
             node.callee = walk(node.callee, {values: context.values, functions: {}, macroes: {},
-                                             asts: context.asts})
+                                             asts: context.asts,
+                                             functionHierarchy: context.functionHierarchy})
             
             const func = contextValue(node.callee, context.functions)
             if(func !== FAIL) {
@@ -440,7 +531,7 @@ export function walk(node, context) {
         node.consequent = walk(node.consequent, context)
     }
     else {
-        console.log('unknown type\n', JSON.stringify(node,null,2), '\n')
+        console.warn('unknown type\n', JSON.stringify(node,null,2), '\n')
     }
     return node
 }

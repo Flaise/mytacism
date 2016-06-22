@@ -1,6 +1,5 @@
 import assert from 'power-assert'
 import {default as process, processAST} from '../src'
-import {merge} from 'ramda'
 import {types} from 'recast'
 
 suite('mytacism')
@@ -34,7 +33,8 @@ const options = Object.freeze({
         functionBody: (a) => a.body,
     },
     asts: {
-        branch: 'if(n) w();'
+        branch: 'if(n) w();',
+        numAST: '20'
     }
 })
 
@@ -361,7 +361,8 @@ for(let pair of [
     `switch(b) {}`,
     `switch(b) { case a: break; }`,
     [`switch(b) { case num: break; }`, `switch(b) { case 1: break; }`],
-    [`switch(b + num) { case r: return 3; case "asdf": return num + 1 }`, `switch(b + 1) { case r: return 3; case "asdf": return 2 }`],
+    [`switch(b + num) { case r: return 3; case "asdf": return num + 1 }`,
+     `switch(b + 1) { case r: return 3; case "asdf": return 2 }`],
     [`switch(num) { case 1: throw new Error(); }`, `throw new Error();`],
     [`switch(1) { case 1: a(); case 2: b(); break; }`, `a();b();`],
     [`switch(1) { case 1: for(;;) break; case 2: b(); break; }`, `for(;;) break;b();`],
@@ -407,7 +408,8 @@ for(let pair of [
     `a instanceof Object`,
     
     `class K {\nconstructor(r) {}\nasdf(r, n) {}\n}`,
-    [`class K {\nconstructor(r) {}\nasdf(r, n) {return num}\n}`, `class K {\nconstructor(r) {}\nasdf(r, n) {return 1}\n}`],
+    [`class K {\nconstructor(r) {}\nasdf(r, n) {return num}\n}`,
+     `class K {\nconstructor(r) {}\nasdf(r, n) {return 1}\n}`],
     [`class K {[num]() { throw e }}`, `class K {[1]() { throw e }}`],
     
     `1,2`,
@@ -416,6 +418,15 @@ for(let pair of [
 
     [`function a() { return 1; return 2; }`, `function a() {\n  return 1;\n}`],
     [`if(a) { throw 1; a = 2 } a = 3`, `if(a) {\n  throw 1;\n} a = 3`],
+
+    [`var d = numAST`, `var d = 20`],
+    [`var d = numAST + 1`, `var d = 21`],
+
+    [`function a(b) { return b + 1 }\na(1)`, `function a(b) { return b + 1 }\n2`],
+    `function a(b) { return b + b }\na(1)`,
+    [`function a(b) { return 9 }\na(2)`, `function a(b) { return 9 }\n9`],
+    [`function a(b) { return b + 1 }\nfunction c(d) { return a(d) }\nc(4)`,
+     `function a(b) { return b + 1 }\nfunction c(d) { return d + 1 }\n5`]
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     expectation = expectation.trim()
@@ -426,9 +437,10 @@ for(let pair of [
 }
 
 for(let [source, validator] of [
-    ['func', /Compile-time function referenced but not called/],
-    ['func; num;', /Compile-time function referenced but not called/],
+    ['func', /referenced but not called/],
+    ['func; num;', /referenced but not called/],
     [`num += 1`, /Can't assign to/],
+    [`num = 1`, /Can't assign to/],
     [`delete num`, /Can't delete/],
     [`delete func`],
     [`delete num.a`],
@@ -455,8 +467,10 @@ for(let [source, validator] of [
 
 
 test('source maps', () => {
-    const result = process(`num\n"asdf"`, merge(options, {sourceFileName: 'file.js', sourceMapName: 'file.js.map'}))
+    const result = process(
+        `num\n"asdf"`,
+        Object.assign({}, options, {sourceFileName: 'file.js', sourceMapName: 'file.js.map'})
+    )
     assert(result.code === `1\n"asdf"`)
     assert(result.map)
-    // console.log(result.map)
 })

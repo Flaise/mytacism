@@ -1,5 +1,5 @@
 import {types} from 'recast'
-import {walk, raiseError, literalToValue, FAIL, valueToNode} from '.'
+import {walk, raiseError, literalToValue, FAIL, valueToNode} from './index'
 
 const unaryOperators = {
     '+': (a => +a),
