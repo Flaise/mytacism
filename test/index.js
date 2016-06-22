@@ -413,6 +413,9 @@ for(let pair of [
     `1,2`,
     `a(),b()`,
     [`a(num), b()`, `a(1), b()`],
+
+    [`function a() { return 1; return 2; }`, `function a() {\n  return 1;\n}`],
+    [`if(a) { throw 1; a = 2 } a = 3`, `if(a) {\n  throw 1;\n} a = 3`],
 ]) {
     let [source, expectation] = (Array.isArray(pair)? pair: [pair, pair])
     expectation = expectation.trim()

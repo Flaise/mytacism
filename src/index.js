@@ -139,6 +139,11 @@ function literalsToValues(nodes) {
     return result
 }
 
+const terminalTypes = ['ContinueStatement', 'BreakStatement', 'ThrowStatement', 'ReturnStatement']
+function isTerminal(node) {
+    return terminalTypes.indexOf(node.type) >= 0
+}
+
 export function walk(node, context) {
     if(Array.isArray(node)) {
         for(let i = 0; i < node.length; i += 1) {
@@ -153,6 +158,11 @@ export function walk(node, context) {
             }
             else {
                 node[i] = result
+
+                if(isTerminal(result)) {
+                    node.splice(i + 1)
+                    break
+                }
             }
         }
     }
