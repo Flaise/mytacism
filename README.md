@@ -1,10 +1,26 @@
+![Mytacism](./images/mytacism.png)
+
 Mytacism
+---
+
+The word mytacism is defined as excessive or wrong use of the sound of the letter M. Therefore, if we say that this library performs analyses on a mabstract myntax mree, then that would be an example of mytacism.
+
+I don't remember why I named this library that.
+
+
+Summary
 ---
 
 Evaluates statically analyzable expressions in Javascript and can evaluate injected compile-time
 constants and functions. Inspired by
 [static-eval](https://github.com/substack/static-eval), which at the time of writing was a promising
 but incomplete solution.
+
+
+Status
+---
+
+Obsolete. Use Parcel, Vite, or Rollup for this functionality instead.
 
 
 Installation
